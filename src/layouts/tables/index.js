@@ -13,27 +13,347 @@ Coded by www.creative-tim.com
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
+import { useState, useEffect } from "react";
+import api from "services/axiosConfig";
+import dayjs from "dayjs";
+
+// react-datepicker
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+
 // @mui material components
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
+import Select from "@mui/material/Select";
+import MenuItem from "@mui/material/MenuItem";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
+import MDInput from "components/MDInput";
+import MDButton from "components/MDButton";
+import MDBadge from "components/MDBadge";
 
 // Material Dashboard 2 React example components
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
-import Footer from "examples/Footer";
 import DataTable from "examples/Tables/DataTable";
 
 // Data
-import authorsTableData from "layouts/tables/data/authorsTableData";
-import projectsTableData from "layouts/tables/data/projectsTableData";
+import authorsTableData, { formatCommandeRow } from "layouts/tables/data/authorsTableData";
+
+const API_BASE_URL = "http://localhost:8080/api/commandes";
+
+const emptyFormData = {
+  chaine: "",
+  commande: "",
+  qté_commandé: "",
+  description: "",
+  date_debut_production: null,
+  date_fin_production: null,
+  date_mise_disposition: null,
+  objectif: "",
+  code_commande: "",
+};
+
+// Génère la liste des chaînes disponibles : "ch 1" à "ch 15"
+const chaineOptions = Array.from({ length: 15 }, (_, i) => `ch ${i + 1}`);
+
+// Couleurs associees a chaque statut, pour l'affichage du badge en direct
+const statutColorMap = {
+  Ouvert: "success",
+  "En attente": "warning",
+  "Jour disposition": "info",
+  Alerte: "error",
+  Fermé: "dark",
+};
+
+/**
+ * Calcule le statut en direct pendant la saisie, a partir des dates
+ * (objets Date issus du DatePicker, peuvent etre null tant que non remplis).
+ *
+ * Regles (par ordre de priorite) :
+ * 1. Aucune date saisie                          -> "En attente"
+ * 2. date_mise_disposition == aujourd'hui        -> "Jour disposition"
+ * 3. date_mise_disposition deja passee           -> "Fermé"
+ * 4. date_mise_disposition dans moins de 2 jours -> "Alerte"
+ * 5. date_debut_production < aujourd'hui         -> "Ouvert"
+ * 6. date_debut_production > aujourd'hui         -> "En attente"
+ */
+function calculerStatutPreview(dateDebutProduction, dateMiseDisposition) {
+  const SEUIL_ALERTE_JOURS = 2;
+
+  if (!dateDebutProduction && !dateMiseDisposition) {
+    return "En attente";
+  }
+
+  const today = dayjs().startOf("day");
+  const dispo = dateMiseDisposition ? dayjs(dateMiseDisposition).startOf("day") : null;
+  const debut = dateDebutProduction ? dayjs(dateDebutProduction).startOf("day") : null;
+
+  if (dispo) {
+    const diffDispoJours = dispo.diff(today, "day");
+
+    if (diffDispoJours === 0) {
+      return "Jour disposition";
+    }
+    if (diffDispoJours < 0) {
+      return "Fermé";
+    }
+    if (diffDispoJours > 0 && diffDispoJours < SEUIL_ALERTE_JOURS) {
+      return "Alerte";
+    }
+  }
+
+  if (debut) {
+    if (debut.isBefore(today)) {
+      return "Ouvert";
+    }
+    if (debut.isAfter(today)) {
+      return "En attente";
+    }
+  }
+
+  return "Ouvert";
+}
+
+/**
+ * Calcule l'écart en jours entre la date de mise à disposition et la date
+ * de fin de production : ecart = date_mise_disposition - date_fin_production.
+ * Retourne null tant que les deux dates ne sont pas renseignees.
+ */
+function calculerEcart(dateFinProduction, dateMiseDisposition) {
+  if (!dateFinProduction || !dateMiseDisposition) {
+    return null;
+  }
+
+  const fin = dayjs(dateFinProduction).startOf("day");
+  const dispo = dayjs(dateMiseDisposition).startOf("day");
+
+  return dispo.diff(fin, "day");
+}
+
+/**
+ * Calcule le nombre de jours en direct : qté_commandé / objectif.
+ * Retourne 0 tant que l'un des deux champs n'est pas renseigné ou si
+ * objectif vaut 0 (division impossible). Arrondi au jour superieur.
+ */
+function calculerNombreJours(qteCommande, objectif) {
+  const qte = Number(qteCommande);
+  const obj = Number(objectif);
+
+  if (!obj || isNaN(qte) || isNaN(obj)) {
+    return 0;
+  }
+
+  return Math.ceil(qte / obj);
+}
 
 function Tables() {
-  const { columns, rows } = authorsTableData();
-  const { columns: pColumns, rows: pRows } = projectsTableData();
+  const { columns } = authorsTableData();
+  const [rows, setRows] = useState([]);
+  const [loadingTable, setLoadingTable] = useState(true);
+
+  const [formData, setFormData] = useState(emptyFormData);
+  const [editingId, setEditingId] = useState(null); // null = creation, sinon = id de la commande en cours de modification
+
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  // Statut recalcule a chaque rendu, en fonction des dates actuellement saisies
+  const statutPreview = calculerStatutPreview(
+    formData.date_debut_production,
+    formData.date_mise_disposition
+  );
+  const statutPreviewColor = statutColorMap[statutPreview] || "secondary";
+
+  // Ecart recalcule a chaque rendu : date_mise_disposition - date_fin_production
+  const ecartPreview = calculerEcart(formData.date_fin_production, formData.date_mise_disposition);
+  const ecartDisplay =
+    ecartPreview === null ? "" : `${ecartPreview > 0 ? "+" : ""}${ecartPreview} j`;
+
+  // Nombre de jours recalcule a chaque rendu : qté_commandé / objectif
+  const nombreJoursPreview = calculerNombreJours(formData.qté_commandé, formData.objectif);
+
+  const fetchCommandes = async () => {
+    setLoadingTable(true);
+    try {
+      const response = await api.get("/commandes/getAllCommandes/");
+      const commandes = response.data.data;
+      setRows(
+        commandes.map((commande) =>
+          formatCommandeRow(commande, { onEdit: handleEdit, onDelete: handleDelete })
+        )
+      );
+    } catch (error) {
+      console.error("Erreur lors de la récupération des commandes:", error);
+    } finally {
+      setLoadingTable(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCommandes();
+  }, []);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // Gestion des dates avec cascade de cohérence
+  const handleDateChange = (name, date) => {
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: date };
+
+      // Si on change la date de début, on vérifie fin + mise à dispo
+      if (name === "date_debut_production") {
+        if (
+          updated.date_fin_production &&
+          date &&
+          dayjs(updated.date_fin_production).isBefore(dayjs(date))
+        ) {
+          updated.date_fin_production = null;
+          updated.date_mise_disposition = null;
+        }
+      }
+
+      // Si on change la date de fin, on vérifie mise à dispo
+      if (name === "date_fin_production") {
+        if (
+          updated.date_mise_disposition &&
+          date &&
+          dayjs(updated.date_mise_disposition).isBefore(dayjs(date))
+        ) {
+          updated.date_mise_disposition = null;
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  // Remplit le formulaire avec les donnees d'une commande existante pour la modifier
+  const handleEdit = (commande) => {
+    setEditingId(commande.id);
+    setMessage("");
+    setFormData({
+      chaine: commande.chaine || "",
+      commande: commande.commande || "",
+      qté_commandé: commande.qté_commandé || "",
+      description: commande.description || "",
+      date_debut_production: commande.date_debut_production
+        ? dayjs(commande.date_debut_production, ["DD/MM/YYYY", "YYYY-MM-DD"]).toDate()
+        : null,
+      date_fin_production: commande.date_fin_production
+        ? dayjs(commande.date_fin_production, ["DD/MM/YYYY", "YYYY-MM-DD"]).toDate()
+        : null,
+      date_mise_disposition: commande.date_mise_disposition
+        ? dayjs(commande.date_mise_disposition, ["DD/MM/YYYY", "YYYY-MM-DD"]).toDate()
+        : null,
+      objectif: commande.objectif || "",
+      code_commande: commande.code_commande || "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setFormData(emptyFormData);
+    setMessage("");
+  };
+
+  // Supprime une commande apres confirmation
+  const handleDelete = async (commande) => {
+    const confirmation = window.confirm(
+      `Voulez-vous vraiment supprimer la commande "${commande.commande}" ?`
+    );
+    if (!confirmation) return;
+
+    try {
+      await api.delete(`/commandes/deleteCommande/${commande.id}`);
+      fetchCommandes();
+    } catch (error) {
+      console.error("Erreur lors de la suppression de la commande:", error);
+      alert("Erreur lors de la suppression de la commande.");
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage("");
+
+    // Validation de cohérence des dates avant envoi
+    const { date_debut_production, date_fin_production, date_mise_disposition } = formData;
+
+    if (date_debut_production && date_fin_production) {
+      if (dayjs(date_fin_production).isBefore(dayjs(date_debut_production))) {
+        setMessage("Erreur : la date de fin doit être après la date de début.");
+        return;
+      }
+    }
+
+    if (date_fin_production && date_mise_disposition) {
+      if (dayjs(date_mise_disposition).isBefore(dayjs(date_fin_production))) {
+        setMessage("Erreur : la date de mise à disposition doit être après la date de fin.");
+        return;
+      }
+    }
+
+    setLoading(true);
+
+    try {
+      const payload = {
+        ...formData,
+        // Statut, ecart et nombre_jours sont calcules automatiquement :
+        // on les envoie pour un affichage optimiste coherent cote client,
+        // le backend les recalcule de toute facon.
+        statut: statutPreview,
+        ecart: ecartPreview,
+        nombre_jours: nombreJoursPreview,
+        date_debut_production: date_debut_production
+          ? dayjs(date_debut_production).format("YYYY-MM-DD")
+          : "",
+        date_fin_production: date_fin_production
+          ? dayjs(date_fin_production).format("YYYY-MM-DD")
+          : "",
+        date_mise_disposition: date_mise_disposition
+          ? dayjs(date_mise_disposition).format("YYYY-MM-DD")
+          : "",
+      };
+
+      if (editingId) {
+        const response = await api.put(`/commandes/updateCommande/${editingId}`, payload);
+        console.log("Commande mise à jour:", response.data);
+        setMessage("Commande mise à jour avec succès !");
+      } else {
+        const response = await api.post("/commandes/createCommande/", payload);
+        console.log("Commande créée:", response.data);
+        setMessage("Commande créée avec succès !");
+      }
+
+      setEditingId(null);
+      setFormData(emptyFormData);
+      fetchCommandes();
+    } catch (error) {
+      console.error("Erreur lors de l'enregistrement de la commande:", error);
+      setMessage("Erreur lors de l'enregistrement de la commande.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Style custom pour que le champ ressemble à un MDInput
+  const datePickerInputStyle = {
+    width: "100%",
+    padding: "12px 12px",
+    borderRadius: "8px",
+    border: "1px solid rgba(0,0,0,0.23)",
+    fontSize: "1rem",
+    fontFamily: "inherit",
+    outline: "none",
+  };
 
   return (
     <DashboardLayout>
@@ -53,20 +373,199 @@ function Tables() {
                 coloredShadow="info"
               >
                 <MDTypography variant="h6" color="white">
-                  Authors Table
+                  {editingId ? "Modifier la commande" : "Nouvelle chaîne de production"}
                 </MDTypography>
               </MDBox>
-              <MDBox pt={3}>
-                <DataTable
-                  table={{ columns, rows }}
-                  isSorted={false}
-                  entriesPerPage={false}
-                  showTotalEntries={false}
-                  noEndBorder
-                />
+              <MDBox pt={3} pb={3} px={2} component="form" onSubmit={handleSubmit}>
+                <Grid container spacing={2}>
+                  {/* Chaine (liste deroulante ch 1 -> ch 15) */}
+                  <Grid item xs={12} sm={4}>
+                    <FormControl fullWidth>
+                      <InputLabel id="chaine-label">Chaîne</InputLabel>
+                      <Select
+                        labelId="chaine-label"
+                        label="Chaîne"
+                        name="chaine"
+                        value={formData.chaine}
+                        onChange={handleChange}
+                        sx={{ height: "45px" }}
+                      >
+                        {chaineOptions.map((option) => (
+                          <MenuItem key={option} value={option}>
+                            {option}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  {/* Statut calcule automatiquement (lecture seule) */}
+                  <Grid item xs={12} sm={4}>
+                    <MDBox
+                      display="flex"
+                      flexDirection="column"
+                      justifyContent="center"
+                      height="45px"
+                    >
+                      <MDTypography variant="caption" color="text" mb={0.5}>
+                        Statut
+                      </MDTypography>
+                      <MDBox>
+                        <MDBadge
+                          badgeContent={statutPreview}
+                          color={statutPreviewColor}
+                          variant="gradient"
+                          size="sm"
+                          container
+                        />
+                      </MDBox>
+                    </MDBox>
+                  </Grid>
+
+                  <Grid item xs={12} sm={4}>
+                    <MDInput
+                      type="text"
+                      label="Commande"
+                      name="commande"
+                      value={formData.commande}
+                      onChange={handleChange}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <MDInput
+                      type="text"
+                      label="Qté commandé"
+                      name="qté_commandé"
+                      value={formData.qté_commandé}
+                      onChange={handleChange}
+                      fullWidth
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <MDInput
+                      type="text"
+                      label="Description"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      fullWidth
+                    />
+                  </Grid>
+
+                  {/* --- Champs date avec react-datepicker --- */}
+                  <Grid item xs={12} sm={4}>
+                    <MDTypography variant="caption" color="text" mb={0.5} display="block">
+                      Date début production
+                    </MDTypography>
+                    <DatePicker
+                      selected={formData.date_debut_production}
+                      onChange={(date) => handleDateChange("date_debut_production", date)}
+                      dateFormat="dd/MM/yyyy"
+                      placeholderText="jj/mm/aaaa"
+                      customInput={<input style={datePickerInputStyle} />}
+                      isClearable
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <MDTypography variant="caption" color="text" mb={0.5} display="block">
+                      Date fin production
+                    </MDTypography>
+                    <DatePicker
+                      selected={formData.date_fin_production}
+                      onChange={(date) => handleDateChange("date_fin_production", date)}
+                      dateFormat="dd/MM/yyyy"
+                      placeholderText="jj/mm/aaaa"
+                      customInput={<input style={datePickerInputStyle} />}
+                      minDate={formData.date_debut_production || null}
+                      disabled={!formData.date_debut_production}
+                      isClearable
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <MDTypography variant="caption" color="text" mb={0.5} display="block">
+                      Date mise à disposition
+                    </MDTypography>
+                    <DatePicker
+                      selected={formData.date_mise_disposition}
+                      onChange={(date) => handleDateChange("date_mise_disposition", date)}
+                      dateFormat="dd/MM/yyyy"
+                      placeholderText="jj/mm/aaaa"
+                      customInput={<input style={datePickerInputStyle} />}
+                      minDate={formData.date_fin_production || null}
+                      disabled={!formData.date_fin_production}
+                      isClearable
+                    />
+                  </Grid>
+                  {/* --- Fin des champs date --- */}
+
+                  {/* Nombre de jours calcule automatiquement (lecture seule) : qté_commandé / objectif */}
+                  <Grid item xs={12} sm={4}>
+                    <MDInput
+                      type="text"
+                      label="Nombre de jours"
+                      name="nombre_jours"
+                      value={nombreJoursPreview}
+                      InputProps={{ readOnly: true }}
+                      disabled
+                      fullWidth
+                    />
+                  </Grid>
+
+                  {/* Ecart calcule automatiquement (lecture seule) : date_mise_disposition - date_fin_production */}
+                  <Grid item xs={12} sm={4}>
+                    <MDInput
+                      type="text"
+                      label="Écart"
+                      name="ecart"
+                      value={ecartDisplay}
+                      InputProps={{ readOnly: true }}
+                      disabled
+                      fullWidth
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={4}>
+                    <MDInput
+                      type="text"
+                      label="Objectif"
+                      name="objectif"
+                      value={formData.objectif}
+                      onChange={handleChange}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <MDInput
+                      type="text"
+                      label="Code commande"
+                      name="code_commande"
+                      value={formData.code_commande}
+                      onChange={handleChange}
+                      fullWidth
+                    />
+                  </Grid>
+                </Grid>
+                <MDBox mt={3} display="flex" alignItems="center" justifyContent="flex-end" gap={2}>
+                  {message && (
+                    <MDTypography variant="button" color="text" mr={2}>
+                      {message}
+                    </MDTypography>
+                  )}
+                  {editingId && (
+                    <MDButton variant="outlined" color="dark" onClick={handleCancelEdit}>
+                      Annuler
+                    </MDButton>
+                  )}
+                  <MDButton type="submit" variant="gradient" color="info" disabled={loading}>
+                    {loading ? "Enregistrement..." : editingId ? "Mettre à jour" : "Enregistrer"}
+                  </MDButton>
+                </MDBox>
               </MDBox>
             </Card>
           </Grid>
+
           <Grid item xs={12}>
             <Card>
               <MDBox
@@ -80,23 +579,30 @@ function Tables() {
                 coloredShadow="info"
               >
                 <MDTypography variant="h6" color="white">
-                  Projects Table
+                  Commandes
                 </MDTypography>
               </MDBox>
               <MDBox pt={3}>
-                <DataTable
-                  table={{ columns: pColumns, rows: pRows }}
-                  isSorted={false}
-                  entriesPerPage={false}
-                  showTotalEntries={false}
-                  noEndBorder
-                />
+                {loadingTable ? (
+                  <MDBox p={3} textAlign="center">
+                    <MDTypography variant="button" color="text">
+                      Chargement des commandes...
+                    </MDTypography>
+                  </MDBox>
+                ) : (
+                  <DataTable
+                    table={{ columns, rows }}
+                    isSorted={false}
+                    entriesPerPage={false}
+                    showTotalEntries={false}
+                    noEndBorder
+                  />
+                )}
               </MDBox>
             </Card>
           </Grid>
         </Grid>
       </MDBox>
-      <Footer />
     </DashboardLayout>
   );
 }

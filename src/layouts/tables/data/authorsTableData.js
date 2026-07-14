@@ -18,160 +18,416 @@ Coded by www.creative-tim.com
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
-import MDAvatar from "components/MDAvatar";
 import MDBadge from "components/MDBadge";
+import MDButton from "components/MDButton";
 
-// Images
-import team2 from "assets/images/team-2.jpg";
-import team3 from "assets/images/team-3.jpg";
-import team4 from "assets/images/team-4.jpg";
+// @mui material components
+import Icon from "@mui/material/Icon";
 
 export default function data() {
-  const Author = ({ image, name, email }) => (
-    <MDBox display="flex" alignItems="center" lineHeight={1}>
-      <MDAvatar src={image} name={name} size="sm" />
-      <MDBox ml={2} lineHeight={1}>
-        <MDTypography display="block" variant="button" fontWeight="medium">
-          {name}
-        </MDTypography>
-        <MDTypography variant="caption">{email}</MDTypography>
-      </MDBox>
-    </MDBox>
-  );
+  return {
+    columns: [
+      { Header: "chaine", accessor: "chaine", align: "center" },
+      { Header: "statut", accessor: "statut", align: "center" },
+      { Header: "commande", accessor: "commande", align: "left" },
+      { Header: "qté commandé", accessor: "qté_commandé", align: "center" },
+      { Header: "description", accessor: "description", align: "left" },
+      { Header: "date debut production", accessor: "date_debut_production", align: "center" },
+      { Header: "date fin production", accessor: "date_fin_production", align: "center" },
+      { Header: "date mise disposition", accessor: "date_mise_disposition", align: "center" },
+      { Header: "nombre jours", accessor: "nombre_jours", align: "center" },
+      { Header: "ecart", accessor: "ecart", align: "center" },
+      { Header: "objectif", accessor: "objectif", align: "center" },
+      { Header: "code commande", accessor: "code_commande", align: "center" },
+      { Header: "action", accessor: "action", align: "center" },
+    ],
+    rows: [],
+  };
+}
 
-  const Job = ({ title, description }) => (
-    <MDBox lineHeight={1} textAlign="left">
-      <MDTypography display="block" variant="caption" color="text" fontWeight="medium">
-        {title}
-      </MDTypography>
-      <MDTypography variant="caption">{description}</MDTypography>
-    </MDBox>
+// Convertit "JJ/MM/AAAA" en objet Date JS valide (retourne null si vide/invalide)
+function parseFrenchDate(dateStr) {
+  if (!dateStr) return null;
+  const [jour, mois, annee] = dateStr.split("/");
+  if (!jour || !mois || !annee) return null;
+  return new Date(`${annee}-${mois}-${jour}`);
+}
+
+// Compare uniquement l'annee/mois/jour, sans tenir compte de l'heure
+function isSameDay(dateA, dateB) {
+  return (
+    dateA.getFullYear() === dateB.getFullYear() &&
+    dateA.getMonth() === dateB.getMonth() &&
+    dateA.getDate() === dateB.getDate()
+  );
+}
+
+// Determine le badge (libelle + couleur) a partir des dates de la commande.
+// Priorite : Jour disposition > Fermé > Alerte > Ouvert / En attente > Ouvert (par defaut)
+export function getStatutBadge(commande) {
+  const currentDate = new Date();
+  const dateDebutProduction = parseFrenchDate(commande.date_debut_production);
+  const dateMiseDisposition = parseFrenchDate(commande.date_mise_disposition);
+
+  const SEUIL_ALERTE_JOURS = 2;
+  const msParJour = 1000 * 60 * 60 * 24;
+
+  // Si aucune date n'est encore saisie, on affiche un statut neutre "En attente"
+  if (!dateDebutProduction && !dateMiseDisposition) {
+    return { label: "En attente", color: "warning" };
+  }
+
+  // 1. Le jour de mise a disposition, c'est aujourd'hui
+  if (dateMiseDisposition && isSameDay(dateMiseDisposition, currentDate)) {
+    return { label: "Jour disposition", color: "info" };
+  }
+
+  // 2. Deja fermé : date de mise a disposition depassee
+  if (dateMiseDisposition && dateMiseDisposition < currentDate) {
+    return { label: "Fermé", color: "dark" };
+  }
+
+  // 3. Alerte : mise a disposition dans moins de 2 jours
+  if (dateMiseDisposition) {
+    const diffJours = (dateMiseDisposition.getTime() - currentDate.getTime()) / msParJour;
+    if (diffJours > 0 && diffJours < SEUIL_ALERTE_JOURS) {
+      return { label: "Alerte", color: "error" };
+    }
+  }
+
+  // 4. Ouvert / En attente selon la date de debut de production
+  if (dateDebutProduction) {
+    if (dateDebutProduction < currentDate) {
+      return { label: "Ouvert", color: "success" };
+    }
+    if (dateDebutProduction > currentDate) {
+      return { label: "En attente", color: "warning" };
+    }
+  }
+
+  // 5. Valeur par defaut si aucune regle ne s'applique
+  return { label: "Ouvert", color: "success" };
+}
+
+// Transforme une commande brute venant de l'API (base SQL) en une ligne
+// affichable par DataTable, avec le badge de statut, le style du dashboard,
+// et les boutons Modifier / Supprimer.
+export function formatCommandeRow(commande, handlers = {}) {
+  const { onEdit, onDelete } = handlers;
+  const { label, color } = getStatutBadge(commande);
+
+  const Cell = ({ value }) => (
+    <MDTypography variant="caption" color="text" fontWeight="medium">
+      {value}
+    </MDTypography>
   );
 
   return {
-    columns: [
-      { Header: "author", accessor: "author", width: "45%", align: "left" },
-      { Header: "function", accessor: "function", align: "left" },
-      { Header: "status", accessor: "status", align: "center" },
-      { Header: "employed", accessor: "employed", align: "center" },
-      { Header: "action", accessor: "action", align: "center" },
-    ],
-
-    rows: [
-      {
-        author: <Author image={team2} name="John Michael" email="john@creative-tim.com" />,
-        function: <Job title="Manager" description="Organization" />,
-        status: (
-          <MDBox ml={-1}>
-            <MDBadge badgeContent="online" color="success" variant="gradient" size="sm" />
-          </MDBox>
-        ),
-        employed: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            23/04/18
-          </MDTypography>
-        ),
-        action: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            Edit
-          </MDTypography>
-        ),
-      },
-      {
-        author: <Author image={team3} name="Alexa Liras" email="alexa@creative-tim.com" />,
-        function: <Job title="Programator" description="Developer" />,
-        status: (
-          <MDBox ml={-1}>
-            <MDBadge badgeContent="offline" color="dark" variant="gradient" size="sm" />
-          </MDBox>
-        ),
-        employed: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            11/01/19
-          </MDTypography>
-        ),
-        action: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            Edit
-          </MDTypography>
-        ),
-      },
-      {
-        author: <Author image={team4} name="Laurent Perrier" email="laurent@creative-tim.com" />,
-        function: <Job title="Executive" description="Projects" />,
-        status: (
-          <MDBox ml={-1}>
-            <MDBadge badgeContent="online" color="success" variant="gradient" size="sm" />
-          </MDBox>
-        ),
-        employed: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            19/09/17
-          </MDTypography>
-        ),
-        action: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            Edit
-          </MDTypography>
-        ),
-      },
-      {
-        author: <Author image={team3} name="Michael Levi" email="michael@creative-tim.com" />,
-        function: <Job title="Programator" description="Developer" />,
-        status: (
-          <MDBox ml={-1}>
-            <MDBadge badgeContent="online" color="success" variant="gradient" size="sm" />
-          </MDBox>
-        ),
-        employed: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            24/12/08
-          </MDTypography>
-        ),
-        action: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            Edit
-          </MDTypography>
-        ),
-      },
-      {
-        author: <Author image={team3} name="Richard Gran" email="richard@creative-tim.com" />,
-        function: <Job title="Manager" description="Executive" />,
-        status: (
-          <MDBox ml={-1}>
-            <MDBadge badgeContent="offline" color="dark" variant="gradient" size="sm" />
-          </MDBox>
-        ),
-        employed: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            04/10/21
-          </MDTypography>
-        ),
-        action: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            Edit
-          </MDTypography>
-        ),
-      },
-      {
-        author: <Author image={team4} name="Miriam Eric" email="miriam@creative-tim.com" />,
-        function: <Job title="Programator" description="Developer" />,
-        status: (
-          <MDBox ml={-1}>
-            <MDBadge badgeContent="offline" color="dark" variant="gradient" size="sm" />
-          </MDBox>
-        ),
-        employed: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            14/09/20
-          </MDTypography>
-        ),
-        action: (
-          <MDTypography component="a" href="#" variant="caption" color="text" fontWeight="medium">
-            Edit
-          </MDTypography>
-        ),
-      },
-    ],
+    chaine: <Cell value={commande.chaine} />,
+    statut: (
+      <MDBox ml={-1}>
+        <MDBadge badgeContent={label} color={color} variant="gradient" size="sm" />
+      </MDBox>
+    ),
+    commande: <Cell value={commande.commande} />,
+    qté_commandé: <Cell value={commande.qté_commandé} />,
+    description: <Cell value={commande.description} />,
+    date_debut_production: <Cell value={commande.date_debut_production} />,
+    date_fin_production: <Cell value={commande.date_fin_production} />,
+    date_mise_disposition: <Cell value={commande.date_mise_disposition} />,
+    nombre_jours: <Cell value={commande.nombre_jours} />,
+    ecart: <Cell value={commande.ecart} />,
+    objectif: <Cell value={commande.objectif} />,
+    code_commande: <Cell value={commande.code_commande} />,
+    action: (
+      <MDBox display="flex" justifyContent="center" gap={1}>
+        <MDButton
+          variant="text"
+          color="info"
+          iconOnly
+          size="small"
+          onClick={() => {
+            if (onEdit) onEdit(commande);
+          }}
+        >
+          <Icon>edit</Icon>
+        </MDButton>
+        <MDButton
+          variant="text"
+          color="error"
+          iconOnly
+          size="small"
+          onClick={() => {
+            if (onDelete) onDelete(commande);
+          }}
+        >
+          <Icon>delete</Icon>
+        </MDButton>
+      </MDBox>
+    ),
   };
 }
+
+/* =========================================================
+ * Formulaire de saisie / edition d'une commande.
+ * Le statut n'est plus saisi manuellement : il est calcule
+ * automatiquement en direct a partir des dates renseignees,
+ * via getStatutBadge (meme logique que dans le tableau).
+ * =========================================================
+ */
+
+import { useState } from "react";
+import PropTypes from "prop-types";
+
+// @mui material components
+import Card from "@mui/material/Card";
+import Grid from "@mui/material/Grid";
+
+// Material Dashboard 2 React components
+import MDInput from "components/MDInput";
+
+// Valeurs par defaut du formulaire (statut retire, il est calcule automatiquement)
+const emptyForm = {
+  chaine: "",
+  commande: "",
+  qté_commandé: "",
+  description: "",
+  date_debut_production: "",
+  date_fin_production: "",
+  date_mise_disposition: "",
+  nombre_jours: "",
+  ecart: "",
+  objectif: "",
+  code_commande: "",
+};
+
+export function ProductionForm({ initialData, onSubmit, onCancel }) {
+  const [formData, setFormData] = useState(initialData || emptyForm);
+
+  // Recalcule le statut a chaque rendu, en fonction des dates actuellement saisies
+  const statutCalcule = getStatutBadge(formData);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    // On inclut le statut calcule dans les donnees envoyees
+    // (le backend le recalculera de toute facon, mais cela permet
+    // un affichage optimiste immediat cote client si besoin)
+    const dataToSend = { ...formData, statut: statutCalcule.label };
+
+    if (onSubmit) {
+      onSubmit(dataToSend);
+    }
+    if (!initialData) {
+      setFormData(emptyForm);
+    }
+  };
+
+  return (
+    <Card>
+      <MDBox p={3}>
+        <MDTypography variant="h5" fontWeight="medium" mb={3}>
+          {initialData ? "Modifier la chaîne de production" : "Nouvelle chaîne de production"}
+        </MDTypography>
+
+        <MDBox component="form" role="form" onSubmit={handleSubmit}>
+          <Grid container spacing={2}>
+            {/* Chaine */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="text"
+                label="Chaîne"
+                name="chaine"
+                value={formData.chaine}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Statut (calcule automatiquement, lecture seule) */}
+            <Grid item xs={12} sm={4}>
+              <MDBox display="flex" flexDirection="column" justifyContent="center" height="45px">
+                <MDTypography variant="caption" color="text" fontWeight="regular" mb={0.5}>
+                  Statut (auto)
+                </MDTypography>
+                <MDBox>
+                  <MDBadge
+                    badgeContent={statutCalcule.label}
+                    color={statutCalcule.color}
+                    variant="gradient"
+                    size="sm"
+                    container
+                  />
+                </MDBox>
+              </MDBox>
+            </Grid>
+
+            {/* Commande */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="text"
+                label="Commande"
+                name="commande"
+                value={formData.commande}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Qté commandé */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="number"
+                label="Qté commandé"
+                name="qté_commandé"
+                value={formData.qté_commandé}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Description */}
+            <Grid item xs={12}>
+              <MDInput
+                type="text"
+                label="Description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Code commande */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="text"
+                label="Code commande"
+                name="code_commande"
+                value={formData.code_commande}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Objectif */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="number"
+                label="Objectif"
+                name="objectif"
+                value={formData.objectif}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Ecart */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="text"
+                label="Écart"
+                name="ecart"
+                value={formData.ecart}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Date debut production */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="text"
+                label="Date début production"
+                name="date_debut_production"
+                placeholder="JJ/MM/AAAA"
+                value={formData.date_debut_production}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Date fin production */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="text"
+                label="Date fin production"
+                name="date_fin_production"
+                placeholder="JJ/MM/AAAA"
+                value={formData.date_fin_production}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Date mise a disposition */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="text"
+                label="Date mise à disposition"
+                name="date_mise_disposition"
+                placeholder="JJ/MM/AAAA"
+                value={formData.date_mise_disposition}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Nombre de jours */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="text"
+                label="Nombre de jours"
+                name="nombre_jours"
+                value={formData.nombre_jours}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+          </Grid>
+
+          <MDBox mt={4} display="flex" justifyContent="flex-end" gap={2}>
+            {onCancel && (
+              <MDButton variant="outlined" color="dark" onClick={onCancel}>
+                Annuler
+              </MDButton>
+            )}
+            <MDButton type="submit" variant="gradient" color="info">
+              Enregistrer
+            </MDButton>
+          </MDBox>
+        </MDBox>
+      </MDBox>
+    </Card>
+  );
+}
+
+// Setting default values for the props of ProductionForm
+ProductionForm.defaultProps = {
+  initialData: null,
+  onCancel: null,
+};
+
+// Typechecking props for the ProductionForm
+ProductionForm.propTypes = {
+  initialData: PropTypes.shape({
+    chaine: PropTypes.string,
+    commande: PropTypes.string,
+    qté_commandé: PropTypes.string,
+    description: PropTypes.string,
+    date_debut_production: PropTypes.string,
+    date_fin_production: PropTypes.string,
+    date_mise_disposition: PropTypes.string,
+    nombre_jours: PropTypes.string,
+    ecart: PropTypes.string,
+    objectif: PropTypes.string,
+    code_commande: PropTypes.string,
+  }),
+  onSubmit: PropTypes.func.isRequired,
+  onCancel: PropTypes.func,
+};

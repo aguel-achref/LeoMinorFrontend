@@ -4,7 +4,7 @@
   "private": true,
   "author": "Creative Tim",
   "license": "See license in https://www.creative-tim.com/license",
-  "description": "React version of Material Dashboard 2 by Creative Tim",
+  "description": "React version of Leo Minor Tunisie by Creative Tim",
   "bugs": {
     "url": "https://github.com/creativetimofficial/material-dashboard-react/issues"
   },
@@ -14,15 +14,18 @@
   },
   "dependencies": {
     "@emotion/cache": "11.10.8",
-    "@emotion/react": "11.10.8",
-    "@emotion/styled": "11.10.8",
-    "@mui/icons-material": "5.11.16",
-    "@mui/material": "5.12.3",
+    "@emotion/react": "^11.10.8",
+    "@emotion/styled": "^11.10.8",
+    "@mui/icons-material": "^5.11.16",
+    "@mui/material": "^5.12.3",
+    "axios": "^1.18.1",
     "chart.js": "4.3.0",
     "chroma-js": "2.4.2",
-    "prop-types": "15.8.1",
+    "dayjs": "^1.11.21",
+    "prop-types": "^15.8.1",
     "react": "18.2.0",
     "react-chartjs-2": "5.2.0",
+    "react-datepicker": "^9.1.0",
     "react-dom": "18.2.0",
     "react-github-btn": "1.4.0",
     "react-router-dom": "6.11.0",
@@ -65,7 +68,7 @@
     "eslint-plugin-jsx-a11y": "6.7.1",
     "eslint-plugin-prettier": "4.2.1",
     "eslint-plugin-react": "7.32.2",
-    "eslint-plugin-react-hooks": "4.6.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
     "prettier": "2.8.8"
   },
   "overrides": {
