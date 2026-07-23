@@ -30,6 +30,8 @@ export default function data() {
       { Header: "chaine", accessor: "chaine", align: "center" },
       { Header: "statut", accessor: "statut", align: "center" },
       { Header: "commande", accessor: "commande", align: "left" },
+      { Header: "client", accessor: "client", align: "left" },
+      { Header: "num semaine", accessor: "num_semaine", align: "center" },
       { Header: "qté commandé", accessor: "qté_commandé", align: "center" },
       { Header: "description", accessor: "description", align: "left" },
       { Header: "date debut production", accessor: "date_debut_production", align: "center" },
@@ -60,6 +62,33 @@ function isSameDay(dateA, dateB) {
     dateA.getMonth() === dateB.getMonth() &&
     dateA.getDate() === dateB.getDate()
   );
+}
+
+// Calcule le numéro de semaine ISO 8601 (1 à 53) d'une date donnée
+function getWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7; // dimanche = 7 au lieu de 0
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+}
+
+/**
+ * Calcule le champ num_semaine à partir des dates (chaînes "JJ/MM/AAAA") :
+ * "S03" si date_debut_production et date_mise_disposition sont dans la
+ * même semaine ISO, sinon "S03_S05". Retourne "" si une date manque.
+ */
+function calculerNumSemainePreview(dateDebutStr, dateDispoStr) {
+  const dateDebut = parseFrenchDate(dateDebutStr);
+  const dateDispo = parseFrenchDate(dateDispoStr);
+  if (!dateDebut || !dateDispo) return "";
+
+  const wDebut = getWeekNumber(dateDebut);
+  const wDispo = getWeekNumber(dateDispo);
+  const sDebut = `S${String(wDebut).padStart(2, "0")}`;
+  const sDispo = `S${String(wDispo).padStart(2, "0")}`;
+
+  return wDebut === wDispo ? sDebut : `${sDebut}_${sDispo}`;
 }
 
 // Determine le badge (libelle + couleur) a partir des dates de la commande.
@@ -130,6 +159,8 @@ export function formatCommandeRow(commande, handlers = {}) {
       </MDBox>
     ),
     commande: <Cell value={commande.commande} />,
+    client: <Cell value={commande.client} />,
+    num_semaine: <Cell value={commande.num_semaine} />,
     qté_commandé: <Cell value={commande.qté_commandé} />,
     description: <Cell value={commande.description} />,
     date_debut_production: <Cell value={commande.date_debut_production} />,
@@ -173,6 +204,8 @@ export function formatCommandeRow(commande, handlers = {}) {
  * Le statut n'est plus saisi manuellement : il est calcule
  * automatiquement en direct a partir des dates renseignees,
  * via getStatutBadge (meme logique que dans le tableau).
+ * Le num_semaine est lui aussi calcule automatiquement a partir
+ * des memes dates (S03 ou S03_S05 selon les semaines ISO).
  * =========================================================
  */
 
@@ -186,10 +219,11 @@ import Grid from "@mui/material/Grid";
 // Material Dashboard 2 React components
 import MDInput from "components/MDInput";
 
-// Valeurs par defaut du formulaire (statut retire, il est calcule automatiquement)
+// Valeurs par defaut du formulaire (statut et num_semaine retires, calcules automatiquement)
 const emptyForm = {
   chaine: "",
   commande: "",
+  client: "",
   qté_commandé: "",
   description: "",
   date_debut_production: "",
@@ -207,6 +241,12 @@ export function ProductionForm({ initialData, onSubmit, onCancel }) {
   // Recalcule le statut a chaque rendu, en fonction des dates actuellement saisies
   const statutCalcule = getStatutBadge(formData);
 
+  // Recalcule le num_semaine a chaque rendu, en fonction des memes dates
+  const numSemaineCalcule = calculerNumSemainePreview(
+    formData.date_debut_production,
+    formData.date_mise_disposition
+  );
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -215,10 +255,10 @@ export function ProductionForm({ initialData, onSubmit, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // On inclut le statut calcule dans les donnees envoyees
+    // On inclut le statut et le num_semaine calcules dans les donnees envoyees
     // (le backend le recalculera de toute facon, mais cela permet
     // un affichage optimiste immediat cote client si besoin)
-    const dataToSend = { ...formData, statut: statutCalcule.label };
+    const dataToSend = { ...formData, statut: statutCalcule.label, num_semaine: numSemaineCalcule };
 
     if (onSubmit) {
       onSubmit(dataToSend);
@@ -275,6 +315,31 @@ export function ProductionForm({ initialData, onSubmit, onCancel }) {
                 name="commande"
                 value={formData.commande}
                 onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Client */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="text"
+                label="Client"
+                name="client"
+                value={formData.client}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Grid>
+
+            {/* Num semaine (calcule automatiquement, lecture seule) */}
+            <Grid item xs={12} sm={4}>
+              <MDInput
+                type="text"
+                label="Numéro de semaine (auto)"
+                name="num_semaine"
+                value={numSemaineCalcule}
+                InputProps={{ readOnly: true }}
+                disabled
                 fullWidth
               />
             </Grid>
@@ -418,6 +483,7 @@ ProductionForm.propTypes = {
   initialData: PropTypes.shape({
     chaine: PropTypes.string,
     commande: PropTypes.string,
+    client: PropTypes.string,
     qté_commandé: PropTypes.string,
     description: PropTypes.string,
     date_debut_production: PropTypes.string,

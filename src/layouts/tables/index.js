@@ -49,6 +49,7 @@ const API_BASE_URL = "http://localhost:8080/api/commandes";
 const emptyFormData = {
   chaine: "",
   commande: "",
+  client: "",
   qté_commandé: "",
   description: "",
   date_debut_production: null,
@@ -151,6 +152,35 @@ function calculerNombreJours(qteCommande, objectif) {
   return Math.ceil(qte / obj);
 }
 
+// Calcule le numéro de semaine ISO 8601 (1 à 53) d'une date donnée
+function getWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7; // dimanche = 7 au lieu de 0
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+}
+
+/**
+ * Calcule le champ num_semaine en direct, a partir des objets Date du
+ * DatePicker : "S03" si date_debut_production et date_mise_disposition
+ * tombent dans la meme semaine ISO (1 a 53), sinon "S03_S05".
+ * Retourne "" tant que les deux dates ne sont pas renseignees.
+ */
+function calculerNumSemaine(dateDebutProduction, dateMiseDisposition) {
+  if (!dateDebutProduction || !dateMiseDisposition) {
+    return "";
+  }
+
+  const wDebut = getWeekNumber(new Date(dateDebutProduction));
+  const wDispo = getWeekNumber(new Date(dateMiseDisposition));
+
+  const sDebut = `S${String(wDebut).padStart(2, "0")}`;
+  const sDispo = `S${String(wDispo).padStart(2, "0")}`;
+
+  return wDebut === wDispo ? sDebut : `${sDebut}_${sDispo}`;
+}
+
 function Tables() {
   const { columns } = authorsTableData();
   const [rows, setRows] = useState([]);
@@ -176,6 +206,12 @@ function Tables() {
 
   // Nombre de jours recalcule a chaque rendu : qté_commandé / objectif
   const nombreJoursPreview = calculerNombreJours(formData.qté_commandé, formData.objectif);
+
+  // Num semaine recalcule a chaque rendu : semaine ISO du debut et de la mise a disposition
+  const numSemainePreview = calculerNumSemaine(
+    formData.date_debut_production,
+    formData.date_mise_disposition
+  );
 
   const fetchCommandes = async () => {
     setLoadingTable(true);
@@ -241,6 +277,7 @@ function Tables() {
     setFormData({
       chaine: commande.chaine || "",
       commande: commande.commande || "",
+      client: commande.client || "",
       qté_commandé: commande.qté_commandé || "",
       description: commande.description || "",
       date_debut_production: commande.date_debut_production
@@ -306,12 +343,13 @@ function Tables() {
     try {
       const payload = {
         ...formData,
-        // Statut, ecart et nombre_jours sont calcules automatiquement :
+        // Statut, ecart, nombre_jours et num_semaine sont calcules automatiquement :
         // on les envoie pour un affichage optimiste coherent cote client,
-        // le backend les recalcule de toute facon.
+        // le backend les recalcule de toute facon (sauf num_semaine, cf. note ci-dessous).
         statut: statutPreview,
         ecart: ecartPreview,
         nombre_jours: nombreJoursPreview,
+        num_semaine: numSemainePreview,
         date_debut_production: date_debut_production
           ? dayjs(date_debut_production).format("YYYY-MM-DD")
           : "",
@@ -432,6 +470,19 @@ function Tables() {
                       fullWidth
                     />
                   </Grid>
+
+                  {/* Client (input simple) */}
+                  <Grid item xs={12} sm={4}>
+                    <MDInput
+                      type="text"
+                      label="Client"
+                      name="client"
+                      value={formData.client}
+                      onChange={handleChange}
+                      fullWidth
+                    />
+                  </Grid>
+
                   <Grid item xs={12} sm={4}>
                     <MDInput
                       type="text"
@@ -520,6 +571,19 @@ function Tables() {
                       label="Écart"
                       name="ecart"
                       value={ecartDisplay}
+                      InputProps={{ readOnly: true }}
+                      disabled
+                      fullWidth
+                    />
+                  </Grid>
+
+                  {/* Num semaine calcule automatiquement (lecture seule) : S03 ou S03_S05 */}
+                  <Grid item xs={12} sm={4}>
+                    <MDInput
+                      type="text"
+                      label="Numéro de semaine"
+                      name="num_semaine"
+                      value={numSemainePreview}
                       InputProps={{ readOnly: true }}
                       disabled
                       fullWidth
