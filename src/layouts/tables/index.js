@@ -194,6 +194,36 @@ function calculerNumSemaine(dateDebutProduction, dateMiseDisposition) {
   return wDebut === wDispo ? sDebut : `${sDebut}_${sDispo}`;
 }
 
+/**
+ * Calcule automatiquement la date de fin de production a partir de la date
+ * de debut de production, en y ajoutant le nombre de jours necessaires :
+ * nombre_jours = ceil(qté_commandé / objectif)
+ * date_fin_production = date_debut_production + nombre_jours
+ *
+ * Retourne null tant que date_debut_production n'est pas renseignee ou que
+ * qté_commandé / objectif ne permettent pas de calculer un nombre de jours
+ * valide (identique a la logique du backend, voir commande.js).
+ */
+function calculerDateFinProduction(dateDebutProduction, qteCommande, objectif) {
+  if (!dateDebutProduction) {
+    return null;
+  }
+
+  const qte = Number(qteCommande);
+  const obj = Number(objectif);
+
+  if (!obj || isNaN(qte) || isNaN(obj)) {
+    return null;
+  }
+
+  const nombreJours = Math.ceil(qte / obj);
+  if (!nombreJours) {
+    return null;
+  }
+
+  return dayjs(dateDebutProduction).add(nombreJours, "day").toDate();
+}
+
 function Tables() {
   const { columns } = authorsTableData();
   const [rows, setRows] = useState([]);
@@ -279,6 +309,37 @@ function Tables() {
     fetchClients();
   }, []);
 
+  // Recalcule automatiquement date_fin_production des que date_debut_production,
+  // qté_commandé ou objectif changent : date_fin_production = date_debut_production
+  // + nombre de jours (qté_commandé / objectif, arrondi au jour superieur).
+  useEffect(() => {
+    const nouvelleDateFin = calculerDateFinProduction(
+      formData.date_debut_production,
+      formData.qté_commandé,
+      formData.objectif
+    );
+
+    setFormData((prev) => {
+      // Evite un re-render inutile si la date calculee n'a pas change
+      const memeDate =
+        (!prev.date_fin_production && !nouvelleDateFin) ||
+        (prev.date_fin_production &&
+          nouvelleDateFin &&
+          dayjs(prev.date_fin_production).isSame(dayjs(nouvelleDateFin), "day"));
+
+      if (memeDate) return prev;
+
+      // Si le nombre de jours n'est pas encore calculable, on vide date_fin_production
+      // et par cascade date_mise_disposition (qui en depend)
+      if (!nouvelleDateFin) {
+        return { ...prev, date_fin_production: null, date_mise_disposition: null };
+      }
+
+      return { ...prev, date_fin_production: nouvelleDateFin };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.date_debut_production, formData.qté_commandé, formData.objectif]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -291,34 +352,15 @@ function Tables() {
     }
   };
 
-  // Gestion des dates avec cascade de cohérence
+  // Gestion des dates. date_fin_production n'est plus modifiable manuellement :
+  // elle est recalculee automatiquement par le useEffect des que
+  // date_debut_production, qté_commandé ou objectif changent.
   const handleDateChange = (name, date) => {
     setFormData((prev) => {
       const updated = { ...prev, [name]: date };
 
-      // Si on change la date de début, on vérifie fin + mise à dispo
-      if (name === "date_debut_production") {
-        if (
-          updated.date_fin_production &&
-          date &&
-          dayjs(updated.date_fin_production).isBefore(dayjs(date))
-        ) {
-          updated.date_fin_production = null;
-          updated.date_mise_disposition = null;
-        }
-      }
-
-      // Si on change la date de fin, on vérifie mise à dispo
-      if (name === "date_fin_production") {
-        if (
-          updated.date_mise_disposition &&
-          date &&
-          dayjs(updated.date_mise_disposition).isBefore(dayjs(date))
-        ) {
-          updated.date_mise_disposition = null;
-        }
-      }
-
+      // Si on change la date de mise a disposition, rien de plus a faire :
+      // elle est bornee par minDate={date_fin_production} dans le DatePicker.
       return updated;
     });
   };
@@ -625,7 +667,7 @@ function Tables() {
                         onClick={handleOpenClientDialog}
                         sx={{ whiteSpace: "nowrap", height: "44px" }}
                       >
-                        Ajouter
+                        Ajouter client
                       </MDButton>
                     </MDBox>
                   </Grid>
@@ -679,17 +721,30 @@ function Tables() {
                   </Grid>
                   <Grid item xs={12} sm={4}>
                     <MDTypography variant="caption" color="text" mb={0.5} display="block">
-                      Date fin production
+                      Date fin production{" "}
+                      <MDTypography
+                        component="span"
+                        variant="caption"
+                        color="text"
+                        fontStyle="italic"
+                      >
+                        (calculée automatiquement)
+                      </MDTypography>
                     </MDTypography>
                     <DatePicker
                       selected={formData.date_fin_production}
-                      onChange={(date) => handleDateChange("date_fin_production", date)}
                       dateFormat="dd/MM/yyyy"
                       placeholderText="jj/mm/aaaa"
-                      customInput={<input style={datePickerInputStyle} />}
-                      minDate={formData.date_debut_production || null}
-                      disabled={!formData.date_debut_production}
-                      isClearable
+                      customInput={
+                        <input
+                          style={{
+                            ...datePickerInputStyle,
+                            backgroundColor: "#f0f2f5",
+                            cursor: "not-allowed",
+                          }}
+                        />
+                      }
+                      disabled
                     />
                   </Grid>
                   <Grid item xs={12} sm={4}>
