@@ -240,6 +240,11 @@ function Tables() {
     formData.date_mise_disposition
   );
 
+  // Récupère l'objet client complet correspondant au nom sélectionné,
+  // pour accéder à sa liste de modèles. Recalculé à chaque rendu.
+  const selectedClientObj = clients.find((c) => c.nom === formData.client);
+  const clientModelsOptions = selectedClientObj?.models || [];
+
   const fetchCommandes = async () => {
     setLoadingTable(true);
     try {
@@ -275,7 +280,15 @@ function Tables() {
   }, []);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    if (name === "client") {
+      // Quand on change de client, on réinitialise le champ models
+      // car la liste de modèles disponibles change en fonction du client
+      setFormData((prev) => ({ ...prev, client: value, models: "" }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   // Gestion des dates avec cascade de cohérence
@@ -628,15 +641,26 @@ function Tables() {
                     />
                   </Grid>
 
+                  {/* Models (liste deroulante alimentee par les modeles du client selectionne) */}
                   <Grid item xs={12}>
-                    <MDInput
-                      type="text"
-                      label="Models"
-                      name="models"
-                      value={formData.models}
-                      onChange={handleChange}
-                      fullWidth
-                    />
+                    <FormControl fullWidth>
+                      <InputLabel id="models-label">Models</InputLabel>
+                      <Select
+                        labelId="models-label"
+                        label="Models"
+                        name="models"
+                        value={formData.models}
+                        onChange={handleChange}
+                        sx={{ height: "45px" }}
+                        disabled={!formData.client || clientModelsOptions.length === 0}
+                      >
+                        {clientModelsOptions.map((model) => (
+                          <MenuItem key={model} value={model}>
+                            {model}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </Grid>
 
                   {/* --- Champs date avec react-datepicker --- */}
