@@ -337,7 +337,6 @@ function Tables() {
 
       return { ...prev, date_fin_production: nouvelleDateFin };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.date_debut_production, formData.qté_commandé, formData.objectif]);
 
   const handleChange = (e) => {
