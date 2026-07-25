@@ -42,7 +42,7 @@ const emptyFormData = {
   commande: "",
   client: "",
   qté_commandé: "",
-  description: "",
+  models: "",
   date_debut_production: null,
   date_fin_production: null,
   date_mise_disposition: null,
@@ -319,7 +319,7 @@ function Tables() {
       commande: commande.commande || "",
       client: commande.client || "",
       qté_commandé: commande.qté_commandé || "",
-      description: commande.description || "",
+      models: commande.models || "",
       date_debut_production: commande.date_debut_production
         ? dayjs(commande.date_debut_production, ["DD/MM/YYYY", "YYYY-MM-DD"]).toDate()
         : null,
@@ -631,9 +631,9 @@ function Tables() {
                   <Grid item xs={12}>
                     <MDInput
                       type="text"
-                      label="Description"
-                      name="description"
-                      value={formData.description}
+                      label="Models"
+                      name="models"
+                      value={formData.models}
                       onChange={handleChange}
                       fullWidth
                     />
