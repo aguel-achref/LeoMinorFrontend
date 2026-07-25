@@ -13,6 +13,12 @@ import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import Chip from "@mui/material/Chip";
+import Stack from "@mui/material/Stack";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -41,6 +47,11 @@ const emptyFormData = {
   date_fin_production: null,
   date_mise_disposition: null,
   objectif: "",
+};
+
+const emptyClientFormData = {
+  nom: "",
+  models: [],
 };
 
 // Génère la liste des chaînes disponibles : "ch 1" à "ch 15"
@@ -194,6 +205,17 @@ function Tables() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  // Liste des clients existants (alimente la liste deroulante "Client")
+  const [clients, setClients] = useState([]);
+  const [loadingClients, setLoadingClients] = useState(true);
+
+  // --- State de la popup "Ajouter client" ---
+  const [clientDialogOpen, setClientDialogOpen] = useState(false);
+  const [clientFormData, setClientFormData] = useState(emptyClientFormData);
+  const [clientModelInput, setClientModelInput] = useState("");
+  const [clientLoading, setClientLoading] = useState(false);
+  const [clientMessage, setClientMessage] = useState("");
+
   // Statut recalcule a chaque rendu, en fonction des dates actuellement saisies
   const statutPreview = calculerStatutPreview(
     formData.date_debut_production,
@@ -235,8 +257,21 @@ function Tables() {
     }
   };
 
+  const fetchClients = async () => {
+    setLoadingClients(true);
+    try {
+      const response = await api.get("/clients/getAllClients");
+      setClients(response.data.data || []);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des clients:", error);
+    } finally {
+      setLoadingClients(false);
+    }
+  };
+
   useEffect(() => {
     fetchCommandes();
+    fetchClients();
   }, []);
 
   const handleChange = (e) => {
@@ -318,6 +353,77 @@ function Tables() {
     } catch (error) {
       console.error("Erreur lors de la suppression de la commande:", error);
       alert("Erreur lors de la suppression de la commande.");
+    }
+  };
+
+  // --- Handlers de la popup "Ajouter client" ---
+
+  const handleOpenClientDialog = () => {
+    setClientFormData(emptyClientFormData);
+    setClientModelInput("");
+    setClientMessage("");
+    setClientDialogOpen(true);
+  };
+
+  const handleCloseClientDialog = () => {
+    setClientDialogOpen(false);
+  };
+
+  const handleClientNomChange = (e) => {
+    setClientFormData({ ...clientFormData, nom: e.target.value });
+  };
+
+  // Ajoute le modele tape dans la liste "models" au chips (Entree ou virgule)
+  const handleAddModelTag = (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const value = clientModelInput.trim();
+      if (value && !clientFormData.models.includes(value)) {
+        setClientFormData({
+          ...clientFormData,
+          models: [...clientFormData.models, value],
+        });
+      }
+      setClientModelInput("");
+    }
+  };
+
+  // Retire un modele de la liste au clic sur le "x" du chip
+  const handleRemoveModelTag = (modelToRemove) => {
+    setClientFormData({
+      ...clientFormData,
+      models: clientFormData.models.filter((m) => m !== modelToRemove),
+    });
+  };
+
+  const handleSubmitClient = async (e) => {
+    e.preventDefault();
+    setClientMessage("");
+
+    if (!clientFormData.nom.trim()) {
+      setClientMessage("Erreur : le nom du client est requis.");
+      return;
+    }
+
+    setClientLoading(true);
+
+    try {
+      await api.post("/clients/createClient", {
+        nom: clientFormData.nom.trim(),
+        models: clientFormData.models,
+      });
+
+      // Rafraichit la liste deroulante et preselectionne le client cree
+      await fetchClients();
+      setFormData((prev) => ({ ...prev, client: clientFormData.nom.trim() }));
+
+      setClientDialogOpen(false);
+      setClientFormData(emptyClientFormData);
+    } catch (error) {
+      console.error("Erreur lors de la création du client:", error);
+      setClientMessage("Erreur lors de la création du client.");
+    } finally {
+      setClientLoading(false);
     }
   };
 
@@ -477,16 +583,38 @@ function Tables() {
                     />
                   </Grid>
 
-                  {/* Client (input simple) */}
+                  {/* Client (liste deroulante alimentee par getAllClients) + bouton d'ajout */}
                   <Grid item xs={12} sm={4}>
-                    <MDInput
-                      type="text"
-                      label="Client"
-                      name="client"
-                      value={formData.client}
-                      onChange={handleChange}
-                      fullWidth
-                    />
+                    <MDBox display="flex" alignItems="flex-end" gap={1}>
+                      <FormControl fullWidth>
+                        <InputLabel id="client-label">Client</InputLabel>
+                        <Select
+                          labelId="client-label"
+                          label="Client"
+                          name="client"
+                          value={formData.client}
+                          onChange={handleChange}
+                          sx={{ height: "45px" }}
+                          disabled={loadingClients}
+                        >
+                          {clients.map((c) => (
+                            <MenuItem key={c.id} value={c.nom}>
+                              {c.nom}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <MDButton
+                        variant="outlined"
+                        color="info"
+                        size="small"
+                        type="button"
+                        onClick={handleOpenClientDialog}
+                        sx={{ whiteSpace: "nowrap", height: "44px" }}
+                      >
+                        Ajouter client
+                      </MDButton>
+                    </MDBox>
                   </Grid>
 
                   <Grid item xs={12} sm={4}>
@@ -676,6 +804,64 @@ function Tables() {
           </Grid>
         </Grid>
       </MDBox>
+
+      {/* --- Popup "Ajouter client" --- */}
+      <Dialog open={clientDialogOpen} onClose={handleCloseClientDialog} fullWidth maxWidth="sm">
+        <DialogTitle>Ajouter un client</DialogTitle>
+        <MDBox component="form" onSubmit={handleSubmitClient}>
+          <DialogContent>
+            <MDBox mb={3}>
+              <MDInput
+                type="text"
+                label="Nom"
+                name="nom"
+                value={clientFormData.nom}
+                onChange={handleClientNomChange}
+                fullWidth
+                autoFocus
+              />
+            </MDBox>
+
+            <MDBox mb={1}>
+              <MDInput
+                type="text"
+                label="Modèles (Entrée pour ajouter)"
+                value={clientModelInput}
+                onChange={(e) => setClientModelInput(e.target.value)}
+                onKeyDown={handleAddModelTag}
+                fullWidth
+              />
+            </MDBox>
+
+            {clientFormData.models.length > 0 && (
+              <Stack direction="row" flexWrap="wrap" gap={1} mt={1}>
+                {clientFormData.models.map((model) => (
+                  <Chip
+                    key={model}
+                    label={model}
+                    color="info"
+                    onDelete={() => handleRemoveModelTag(model)}
+                  />
+                ))}
+              </Stack>
+            )}
+
+            {clientMessage && (
+              <MDTypography variant="button" color="error" mt={2} display="block">
+                {clientMessage}
+              </MDTypography>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <MDButton variant="outlined" color="dark" onClick={handleCloseClientDialog}>
+              Annuler
+            </MDButton>
+            <MDButton type="submit" variant="gradient" color="info" disabled={clientLoading}>
+              {clientLoading ? "Ajout..." : "Ajouter"}
+            </MDButton>
+          </DialogActions>
+        </MDBox>
+      </Dialog>
     </DashboardLayout>
   );
 }
