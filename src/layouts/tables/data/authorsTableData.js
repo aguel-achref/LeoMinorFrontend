@@ -1,21 +1,3 @@
-/* eslint-disable react/prop-types */
-/* eslint-disable react/function-component-definition */
-/**
-=========================================================
-* Material Dashboard 2 React - v2.2.0
-=========================================================
-
-* Product Page: https://www.creative-tim.com/product/material-dashboard-react
-* Copyright 2023 Creative Tim (https://www.creative-tim.com)
-
-Coded by www.creative-tim.com
-
- =========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-*/
-
-// Material Dashboard 2 React components
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
 import MDBadge from "components/MDBadge";
@@ -40,7 +22,7 @@ export default function data() {
       { Header: "nombre jours", accessor: "nombre_jours", align: "center" },
       { Header: "ecart", accessor: "ecart", align: "center" },
       { Header: "objectif", accessor: "objectif", align: "center" },
-      { Header: "code commande", accessor: "code_commande", align: "center" },
+      { Header: "objectif heure", accessor: "objectif_heure", align: "center" },
       { Header: "action", accessor: "action", align: "center" },
     ],
     rows: [],
@@ -142,7 +124,7 @@ export function formatCommandeRow(commande, handlers = {}) {
     nombre_jours: <Cell value={commande.nombre_jours} />,
     ecart: <Cell value={commande.ecart} />,
     objectif: <Cell value={commande.objectif} />,
-    code_commande: <Cell value={commande.code_commande} />,
+    objectif_heure: <Cell value={commande.objectif_heure} />,
     action: (
       <MDBox display="flex" justifyContent="center" gap={1}>
         <MDButton

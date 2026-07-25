@@ -1,18 +1,3 @@
-/**
-=========================================================
-* Material Dashboard 2 React - v2.2.0
-=========================================================
-
-* Product Page: https://www.creative-tim.com/product/material-dashboard-react
-* Copyright 2023 Creative Tim (https://www.creative-tim.com)
-
-Coded by www.creative-tim.com
-
- =========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-*/
-
 import { useState, useEffect } from "react";
 import api from "services/axiosConfig";
 import dayjs from "dayjs";
@@ -56,7 +41,6 @@ const emptyFormData = {
   date_fin_production: null,
   date_mise_disposition: null,
   objectif: "",
-  code_commande: "",
 };
 
 // Génère la liste des chaînes disponibles : "ch 1" à "ch 15"
@@ -152,6 +136,21 @@ function calculerNombreJours(qteCommande, objectif) {
   return Math.ceil(qte / obj);
 }
 
+/**
+ * Calcule l'objectif horaire en direct : objectif (quotidien) / heures de
+ * travail par jour (8h par defaut). Retourne 0 tant que objectif n'est pas
+ * renseigné ou invalide. Correspond a la requete SQL "obj_heure" cote backend.
+ */
+function calculerObjectifHeure(objectif, heuresParJour = 8) {
+  const obj = Number(objectif);
+
+  if (!obj || isNaN(obj) || !heuresParJour) {
+    return 0;
+  }
+
+  return Math.round((obj / heuresParJour) * 100) / 100;
+}
+
 // Calcule le numéro de semaine ISO 8601 (1 à 53) d'une date donnée
 function getWeekNumber(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -206,6 +205,9 @@ function Tables() {
 
   // Nombre de jours recalcule a chaque rendu : qté_commandé / objectif
   const nombreJoursPreview = calculerNombreJours(formData.qté_commandé, formData.objectif);
+
+  // Objectif heure recalcule a chaque rendu : objectif / 8h
+  const objectifHeurePreview = calculerObjectifHeure(formData.objectif);
 
   // Num semaine recalcule a chaque rendu : semaine ISO du debut et de la mise a disposition
   const numSemainePreview = calculerNumSemaine(
@@ -290,7 +292,6 @@ function Tables() {
         ? dayjs(commande.date_mise_disposition, ["DD/MM/YYYY", "YYYY-MM-DD"]).toDate()
         : null,
       objectif: commande.objectif || "",
-      code_commande: commande.code_commande || "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -343,12 +344,14 @@ function Tables() {
     try {
       const payload = {
         ...formData,
-        // Statut, ecart, nombre_jours et num_semaine sont calcules automatiquement :
-        // on les envoie pour un affichage optimiste coherent cote client,
-        // le backend les recalcule de toute facon (sauf num_semaine, cf. note ci-dessous).
+        // Statut, ecart, nombre_jours, objectif_heure et num_semaine sont calcules
+        // automatiquement : on les envoie pour un affichage optimiste coherent cote
+        // client, le backend les recalcule de toute facon (objectif_heure via la
+        // requete SQL "obj_heure").
         statut: statutPreview,
         ecart: ecartPreview,
         nombre_jours: nombreJoursPreview,
+        objectif_heure: objectifHeurePreview,
         num_semaine: numSemainePreview,
         date_debut_production: date_debut_production
           ? dayjs(date_debut_production).format("YYYY-MM-DD")
@@ -600,13 +603,16 @@ function Tables() {
                       fullWidth
                     />
                   </Grid>
+
+                  {/* Objectif heure calcule automatiquement (lecture seule) : objectif / 8h -- remplace code_commande */}
                   <Grid item xs={12} sm={4}>
                     <MDInput
                       type="text"
-                      label="Code commande"
-                      name="code_commande"
-                      value={formData.code_commande}
-                      onChange={handleChange}
+                      label="Objectif heure"
+                      name="objectif_heure"
+                      value={objectifHeurePreview}
+                      InputProps={{ readOnly: true }}
+                      disabled
                       fullWidth
                     />
                   </Grid>
