@@ -121,11 +121,13 @@ function calculerEcart(dateFinProduction, dateMiseDisposition) {
 }
 
 /**
- * Calcule le nombre de jours en direct : qté_commandé / objectif.
+ * Calcule le nombre d'heures en direct :
+ * 1. nombre de jours = qté_commandé / objectif (arrondi au jour superieur)
+ * 2. nombre_heure = nombre de jours * 9h de travail par jour
  * Retourne 0 tant que l'un des deux champs n'est pas renseigné ou si
- * objectif vaut 0 (division impossible). Arrondi au jour superieur.
+ * objectif vaut 0 (division impossible).
  */
-function calculerNombreJours(qteCommande, objectif) {
+function calculerNombreHeure(qteCommande, objectif, heuresParJour = 9) {
   const qte = Number(qteCommande);
   const obj = Number(objectif);
 
@@ -133,7 +135,8 @@ function calculerNombreJours(qteCommande, objectif) {
     return 0;
   }
 
-  return Math.ceil(qte / obj);
+  const nombreJours = Math.ceil(qte / obj);
+  return nombreJours * heuresParJour;
 }
 
 /**
@@ -203,8 +206,8 @@ function Tables() {
   const ecartDisplay =
     ecartPreview === null ? "" : `${ecartPreview > 0 ? "+" : ""}${ecartPreview} j`;
 
-  // Nombre de jours recalcule a chaque rendu : qté_commandé / objectif
-  const nombreJoursPreview = calculerNombreJours(formData.qté_commandé, formData.objectif);
+  // Nombre d'heures recalcule a chaque rendu : (qté_commandé / objectif) jours * 9h
+  const nombreHeurePreview = calculerNombreHeure(formData.qté_commandé, formData.objectif);
 
   // Objectif heure recalcule a chaque rendu : objectif / 8h
   const objectifHeurePreview = calculerObjectifHeure(formData.objectif);
@@ -350,7 +353,7 @@ function Tables() {
         // requete SQL "obj_heure").
         statut: statutPreview,
         ecart: ecartPreview,
-        nombre_jours: nombreJoursPreview,
+        nombre_heure: nombreHeurePreview,
         objectif_heure: objectifHeurePreview,
         num_semaine: numSemainePreview,
         date_debut_production: date_debut_production
@@ -554,13 +557,13 @@ function Tables() {
                   </Grid>
                   {/* --- Fin des champs date --- */}
 
-                  {/* Nombre de jours calcule automatiquement (lecture seule) : qté_commandé / objectif */}
+                  {/* Nombre d'heures calcule automatiquement (lecture seule) : (qté_commandé / objectif) jours * 9h */}
                   <Grid item xs={12} sm={4}>
                     <MDInput
                       type="text"
-                      label="Nombre de jours"
-                      name="nombre_jours"
-                      value={nombreJoursPreview}
+                      label="Nombre d'heures"
+                      name="nombre_heure"
+                      value={nombreHeurePreview}
                       InputProps={{ readOnly: true }}
                       disabled
                       fullWidth
