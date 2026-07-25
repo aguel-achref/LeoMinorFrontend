@@ -1,8 +1,9 @@
+import PropTypes from "prop-types";
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
 import MDBadge from "components/MDBadge";
 import MDButton from "components/MDButton";
-s;
+
 // @mui material components
 import Icon from "@mui/material/Icon";
 
@@ -105,6 +106,14 @@ export function formatCommandeRow(commande, handlers = {}) {
       {value}
     </MDTypography>
   );
+
+  Cell.propTypes = {
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  };
+
+  Cell.defaultProps = {
+    value: "",
+  };
 
   return {
     chaine: <Cell value={commande.chaine} />,
