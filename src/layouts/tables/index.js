@@ -666,7 +666,7 @@ function Tables() {
                         onClick={handleOpenClientDialog}
                         sx={{ whiteSpace: "nowrap", height: "44px" }}
                       >
-                        Ajouter client
+                        Ajouter
                       </MDButton>
                     </MDBox>
                   </Grid>
