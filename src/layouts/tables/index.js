@@ -726,9 +726,7 @@ function Tables() {
                         variant="caption"
                         color="text"
                         fontStyle="italic"
-                      >
-                        (calculée automatiquement)
-                      </MDTypography>
+                      ></MDTypography>
                     </MDTypography>
                     <DatePicker
                       selected={formData.date_fin_production}
