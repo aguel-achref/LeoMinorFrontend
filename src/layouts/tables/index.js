@@ -36,7 +36,7 @@ import DataTable from "examples/Tables/DataTable";
 import authorsTableData, { formatCommandeRow } from "layouts/tables/data/authorsTableData";
 
 // Popup d'édition (fichier externe) : fetch getOneCommande/:id + formulaire + update
-import UpdateCommandeModal from "layouts/tables/data/updatecommandeModal";
+import UpdateCommandeModal from "layouts/tables/data/UpdateCommandeModal";
 
 const API_BASE_URL = "http://localhost:8080/api/commandes";
 
