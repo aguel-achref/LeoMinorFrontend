@@ -223,7 +223,16 @@ function UpdateCommandeModal({ open, commandeId, clients, onClose, onUpdated }) 
       setMessage("");
       try {
         const response = await api.get(`/commandes/getOneCommande/${commandeId}`);
-        const commande = response.data.data;
+        // L'API renvoie "data" sous forme de tableau (ex: [{...}]),
+        // meme quand elle ne contient qu'une seule commande.
+        const commande = Array.isArray(response.data.data)
+          ? response.data.data[0]
+          : response.data.data;
+
+        if (!commande) {
+          setMessage("Commande introuvable.");
+          return;
+        }
 
         setFormData({
           chaine: commande.chaine || "",
