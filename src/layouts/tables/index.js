@@ -35,6 +35,9 @@ import DataTable from "examples/Tables/DataTable";
 // Data
 import authorsTableData, { formatCommandeRow } from "layouts/tables/data/authorsTableData";
 
+// Popup d'édition (fichier externe) : fetch getOneCommande/:id + formulaire + update
+import UpdateCommandeModal from "layouts/tables/components/UpdateCommandeModal";
+
 const API_BASE_URL = "http://localhost:8080/api/commandes";
 
 const emptyFormData = {
@@ -230,7 +233,6 @@ function Tables() {
   const [loadingTable, setLoadingTable] = useState(true);
 
   const [formData, setFormData] = useState(emptyFormData);
-  const [editingId, setEditingId] = useState(null); // null = creation, sinon = id de la commande en cours de modification
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -245,6 +247,12 @@ function Tables() {
   const [clientModelInput, setClientModelInput] = useState("");
   const [clientLoading, setClientLoading] = useState(false);
   const [clientMessage, setClientMessage] = useState("");
+
+  // --- State de la popup "Modifier une commande" ---
+  // La popup se charge elle-meme d'aller chercher la commande via
+  // GET /commandes/getOneCommande/:id des qu'on lui passe un id.
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [editingCommandeId, setEditingCommandeId] = useState(null);
 
   // Statut recalcule a chaque rendu, en fonction des dates actuellement saisies
   const statutPreview = calculerStatutPreview(
@@ -355,43 +363,20 @@ function Tables() {
   // elle est recalculee automatiquement par le useEffect des que
   // date_debut_production, qté_commandé ou objectif changent.
   const handleDateChange = (name, date) => {
-    setFormData((prev) => {
-      const updated = { ...prev, [name]: date };
-
-      // Si on change la date de mise a disposition, rien de plus a faire :
-      // elle est bornee par minDate={date_fin_production} dans le DatePicker.
-      return updated;
-    });
+    setFormData((prev) => ({ ...prev, [name]: date }));
   };
 
-  // Remplit le formulaire avec les donnees d'une commande existante pour la modifier
+  // Ouvre la popup de modification pour la commande selectionnee. Le
+  // formulaire est rempli par UpdateCommandeModal lui-meme via un appel a
+  // GET /commandes/getOneCommande/:id, on se contente donc de passer l'id.
   const handleEdit = (commande) => {
-    setEditingId(commande.id);
-    setMessage("");
-    setFormData({
-      chaine: commande.chaine || "",
-      commande: commande.commande || "",
-      client: commande.client || "",
-      qté_commandé: commande.qté_commandé || "",
-      models: commande.models || "",
-      date_debut_production: commande.date_debut_production
-        ? dayjs(commande.date_debut_production, ["DD/MM/YYYY", "YYYY-MM-DD"]).toDate()
-        : null,
-      date_fin_production: commande.date_fin_production
-        ? dayjs(commande.date_fin_production, ["DD/MM/YYYY", "YYYY-MM-DD"]).toDate()
-        : null,
-      date_mise_disposition: commande.date_mise_disposition
-        ? dayjs(commande.date_mise_disposition, ["DD/MM/YYYY", "YYYY-MM-DD"]).toDate()
-        : null,
-      objectif: commande.objectif || "",
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setEditingCommandeId(commande.id);
+    setUpdateModalOpen(true);
   };
 
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setFormData(emptyFormData);
-    setMessage("");
+  const handleCloseUpdateModal = () => {
+    setUpdateModalOpen(false);
+    setEditingCommandeId(null);
   };
 
   // Supprime une commande apres confirmation
@@ -481,6 +466,8 @@ function Tables() {
     }
   };
 
+  // Formulaire principal : creation uniquement. La modification passe
+  // desormais par la popup UpdateCommandeModal (voir handleEdit).
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
@@ -527,17 +514,10 @@ function Tables() {
           : "",
       };
 
-      if (editingId) {
-        const response = await api.put(`/commandes/updateCommande/${editingId}`, payload);
-        console.log("Commande mise à jour:", response.data);
-        setMessage("Commande mise à jour avec succès !");
-      } else {
-        const response = await api.post("/commandes/createCommande/", payload);
-        console.log("Commande créée:", response.data);
-        setMessage("Commande créée avec succès !");
-      }
+      const response = await api.post("/commandes/createCommande/", payload);
+      console.log("Commande créée:", response.data);
+      setMessage("Commande créée avec succès !");
 
-      setEditingId(null);
       setFormData(emptyFormData);
       fetchCommandes();
     } catch (error) {
@@ -577,7 +557,7 @@ function Tables() {
                 coloredShadow="info"
               >
                 <MDTypography variant="h6" color="white">
-                  {editingId ? "Modifier la commande" : "Nouvelle chaîne de production"}
+                  Nouvelle chaîne de production
                 </MDTypography>
               </MDBox>
               <MDBox pt={3} pb={3} px={2} component="form" onSubmit={handleSubmit}>
@@ -830,13 +810,8 @@ function Tables() {
                       {message}
                     </MDTypography>
                   )}
-                  {editingId && (
-                    <MDButton variant="outlined" color="dark" onClick={handleCancelEdit}>
-                      Annuler
-                    </MDButton>
-                  )}
                   <MDButton type="submit" variant="gradient" color="info" disabled={loading}>
-                    {loading ? "Enregistrement..." : editingId ? "Mettre à jour" : "Enregistrer"}
+                    {loading ? "Enregistrement..." : "Enregistrer"}
                   </MDButton>
                 </MDBox>
               </MDBox>
@@ -938,6 +913,15 @@ function Tables() {
           </DialogActions>
         </MDBox>
       </Dialog>
+
+      {/* --- Popup "Modifier la commande" (fichier externe UpdateCommandeModal) --- */}
+      <UpdateCommandeModal
+        open={updateModalOpen}
+        commandeId={editingCommandeId}
+        clients={clients}
+        onClose={handleCloseUpdateModal}
+        onUpdated={fetchCommandes}
+      />
     </DashboardLayout>
   );
 }
