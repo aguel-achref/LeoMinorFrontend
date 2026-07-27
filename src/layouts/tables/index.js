@@ -38,6 +38,9 @@ import authorsTableData, { formatCommandeRow } from "layouts/tables/data/authors
 // Popup d'édition (fichier externe) : fetch getOneCommande/:id + formulaire + update
 import UpdateCommandeModal from "layouts/tables/data/UpdateCommandeModal";
 
+// Bouton d'export Excel de toutes les commandes
+import ExportCommande from "layouts/tables/data/ExportCommande";
+
 const API_BASE_URL = "http://localhost:8080/api/commandes";
 
 const emptyFormData = {
@@ -829,10 +832,14 @@ function Tables() {
                 bgColor="info"
                 borderRadius="lg"
                 coloredShadow="info"
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
               >
                 <MDTypography variant="h6" color="white">
                   Commandes
                 </MDTypography>
+                <ExportCommande />
               </MDBox>
               <MDBox pt={3}>
                 {loadingTable ? (
