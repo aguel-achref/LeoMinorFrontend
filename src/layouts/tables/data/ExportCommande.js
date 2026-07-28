@@ -7,6 +7,11 @@ import Icon from "@mui/material/Icon";
  * Bouton d'export Excel de toutes les commandes.
  * Appelle GET /commandes/export (backend) et déclenche le téléchargement
  * du fichier .xlsx généré côté serveur.
+ *
+ * Sécurité : si le serveur répond une erreur JSON (401, 404, 500...) au lieu
+ * du fichier Excel, axios la reçoit quand même en tant que blob binaire.
+ * On vérifie donc le Content-Type de la réponse avant de déclencher le
+ * téléchargement, pour éviter un fichier .xlsx corrompu/illisible.
  */
 function ExportCommande() {
   const [loading, setLoading] = useState(false);
@@ -15,8 +20,17 @@ function ExportCommande() {
     setLoading(true);
     try {
       const response = await api.get("/commandes/getAllCommandes", {
-        responseType: "blob", // nécessaire pour recevoir un fichier binaire
+        responseType: "blob",
       });
+
+      const contentType = response.headers["content-type"] || "";
+
+      // Le backend n'a pas renvoyé un fichier Excel : c'est une erreur JSON
+      if (contentType.includes("application/json")) {
+        const text = await response.data.text();
+        const errorData = JSON.parse(text);
+        throw new Error(errorData.message || "Erreur inconnue lors de l'export.");
+      }
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const dateStr = new Date().toISOString().split("T")[0];
@@ -30,7 +44,7 @@ function ExportCommande() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Erreur lors de l'export des commandes:", error);
-      alert("Erreur lors de l'export Excel.");
+      alert(error.message || "Erreur lors de l'export Excel.");
     } finally {
       setLoading(false);
     }
