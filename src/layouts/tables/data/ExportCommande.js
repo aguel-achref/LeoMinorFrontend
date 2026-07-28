@@ -14,7 +14,7 @@ function ExportCommande() {
   const handleExport = async () => {
     setLoading(true);
     try {
-      const response = await api.get("/commandes/exportCommandes", {
+      const response = await api.get("/commandes/getAllCommandes", {
         responseType: "blob", // nécessaire pour recevoir un fichier binaire
       });
 
