@@ -19,7 +19,7 @@ function ExportCommande() {
   const handleExport = async () => {
     setLoading(true);
     try {
-      const response = await api.get("/commandes/exportCommandes", {
+      const response = await api.get("/commandes/export", {
         responseType: "blob",
       });
 
