@@ -41,6 +41,9 @@ import UpdateCommandeModal from "layouts/tables/data/UpdateCommandeModal";
 // Bouton d'export Excel de toutes les commandes
 import ExportCommande from "layouts/tables/data/ExportCommande";
 
+// Bouton + popup d'import Excel (création directe de commandes)
+import ImportCommande from "layouts/tables/data/ImportCommande";
+
 const API_BASE_URL = "http://localhost:8080/api/commandes";
 
 const emptyFormData = {
@@ -898,7 +901,10 @@ function Tables() {
                 <MDTypography variant="h6" color="white">
                   Commandes
                 </MDTypography>
-                <ExportCommande />
+                <MDBox display="flex" gap={1}>
+                  <ImportCommande clients={clients} onImported={fetchCommandes} />
+                  <ExportCommande />
+                </MDBox>
               </MDBox>
               <MDBox pt={3}>
                 {loadingTable ? (
