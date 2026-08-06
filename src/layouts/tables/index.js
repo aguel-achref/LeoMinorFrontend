@@ -251,6 +251,9 @@ function Tables() {
   const [clientLoading, setClientLoading] = useState(false);
   const [clientMessage, setClientMessage] = useState("");
 
+  // Suppression client : indicateur de chargement pendant l'appel DELETE
+  const [deletingClient, setDeletingClient] = useState(false);
+
   // --- State de la popup "Modifier une commande" ---
   // La popup se charge elle-meme d'aller chercher la commande via
   // GET /commandes/getOneCommande/:id des qu'on lui passe un id.
@@ -260,7 +263,7 @@ function Tables() {
   // Statut recalcule a chaque rendu, en fonction des dates actuellement saisies
   const statutPreview = calculerStatutPreview(
     formData.date_debut_production,
-    formData.date_mise_disposition
+    formData.date_mise_disposition,
   );
   const statutPreviewColor = statutColorMap[statutPreview] || "secondary";
 
@@ -278,7 +281,7 @@ function Tables() {
   // Num semaine recalcule a chaque rendu : semaine ISO du debut et de la mise a disposition
   const numSemainePreview = calculerNumSemaine(
     formData.date_debut_production,
-    formData.date_mise_disposition
+    formData.date_mise_disposition,
   );
 
   // Récupère l'objet client complet correspondant au nom sélectionné,
@@ -293,8 +296,8 @@ function Tables() {
       const commandes = response.data.data;
       setRows(
         commandes.map((commande) =>
-          formatCommandeRow(commande, { onEdit: handleEdit, onDelete: handleDelete })
-        )
+          formatCommandeRow(commande, { onEdit: handleEdit, onDelete: handleDelete }),
+        ),
       );
     } catch (error) {
       console.error("Erreur lors de la récupération des commandes:", error);
@@ -327,7 +330,7 @@ function Tables() {
     const nouvelleDateFin = calculerDateFinProduction(
       formData.date_debut_production,
       formData.qté_commandé,
-      formData.objectif
+      formData.objectif,
     );
 
     setFormData((prev) => {
@@ -385,7 +388,7 @@ function Tables() {
   // Supprime une commande apres confirmation
   const handleDelete = async (commande) => {
     const confirmation = window.confirm(
-      `Voulez-vous vraiment supprimer la commande "${commande.commande}" ?`
+      `Voulez-vous vraiment supprimer la commande "${commande.commande}" ?`,
     );
     if (!confirmation) return;
 
@@ -466,6 +469,31 @@ function Tables() {
       setClientMessage("Erreur lors de la création du client.");
     } finally {
       setClientLoading(false);
+    }
+  };
+
+  // Supprime le client actuellement sélectionné dans le formulaire, après
+  // confirmation. Appelle DELETE /api/clients/deleteClient/:id, rafraichit
+  // la liste des clients, et vide les champs client/models du formulaire.
+  const handleDeleteClient = async () => {
+    if (!selectedClientObj) return;
+
+    const confirmation = window.confirm(
+      `Voulez-vous vraiment supprimer le client "${selectedClientObj.nom}" ? Cette action est irréversible.`,
+    );
+    if (!confirmation) return;
+
+    setDeletingClient(true);
+
+    try {
+      await api.delete(`/clients/deleteClient/${selectedClientObj.id}`);
+      setFormData((prev) => ({ ...prev, client: "", models: "" }));
+      await fetchClients();
+    } catch (error) {
+      console.error("Erreur lors de la suppression du client:", error);
+      alert("Erreur lors de la suppression du client.");
+    } finally {
+      setDeletingClient(false);
     }
   };
 
@@ -620,7 +648,7 @@ function Tables() {
                     />
                   </Grid>
 
-                  {/* Client (liste deroulante alimentee par getAllClients) + bouton d'ajout */}
+                  {/* Client (liste deroulante alimentee par getAllClients) + boutons Ajouter/Supprimer */}
                   <Grid item xs={12} sm={4}>
                     <MDBox display="flex" alignItems="flex-end" gap={1}>
                       <FormControl fullWidth>
@@ -650,6 +678,17 @@ function Tables() {
                         sx={{ whiteSpace: "nowrap", height: "44px" }}
                       >
                         Ajouter
+                      </MDButton>
+                      <MDButton
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        type="button"
+                        onClick={handleDeleteClient}
+                        disabled={!formData.client || deletingClient}
+                        sx={{ whiteSpace: "nowrap", height: "44px" }}
+                      >
+                        {deletingClient ? "..." : "Supprimer"}
                       </MDButton>
                     </MDBox>
                   </Grid>
