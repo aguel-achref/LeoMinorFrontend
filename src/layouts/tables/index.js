@@ -202,9 +202,17 @@ function calculerNumSemaine(dateDebutProduction, dateMiseDisposition) {
 
 /**
  * Calcule automatiquement la date de fin de production a partir de la date
- * de debut de production, en y ajoutant le nombre de jours necessaires :
+ * de debut de production, en comptant nombre_jours jours de production (le
+ * jour de debut compte comme le 1er jour), en excluant les dimanches.
+ *
  * nombre_jours = ceil(qté_commandé / objectif)
- * date_fin_production = date_debut_production + nombre_jours
+ *
+ * Exemple : qté_commandé = 100, objectif = 100 -> nombre_jours = 1
+ * -> date_fin_production = date_debut_production (meme jour, si ce n'est
+ * pas un dimanche).
+ *
+ * Si un dimanche est rencontre pendant le comptage, il est ignore (ne
+ * compte pas comme jour de production).
  *
  * Retourne null tant que date_debut_production n'est pas renseignee ou que
  * qté_commandé / objectif ne permettent pas de calculer un nombre de jours
@@ -227,7 +235,19 @@ function calculerDateFinProduction(dateDebutProduction, qteCommande, objectif) {
     return null;
   }
 
-  return dayjs(dateDebutProduction).add(nombreJours, "day").toDate();
+  let current = dayjs(dateDebutProduction).startOf("day");
+  let joursComptes = 0;
+
+  // day() renvoie 0 pour dimanche (comme getDay() en JS natif)
+  while (true) {
+    if (current.day() !== 0) {
+      joursComptes++;
+      if (joursComptes === nombreJours) break;
+    }
+    current = current.add(1, "day");
+  }
+
+  return current.toDate();
 }
 
 function Tables() {
@@ -325,7 +345,7 @@ function Tables() {
 
   // Recalcule automatiquement date_fin_production des que date_debut_production,
   // qté_commandé ou objectif changent : date_fin_production = date_debut_production
-  // + nombre de jours (qté_commandé / objectif, arrondi au jour superieur).
+  // + nombre de jours (qté_commandé / objectif, arrondi au jour superieur, dimanches exclus).
   useEffect(() => {
     const nouvelleDateFin = calculerDateFinProduction(
       formData.date_debut_production,
