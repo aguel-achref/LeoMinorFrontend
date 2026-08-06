@@ -263,7 +263,7 @@ function Tables() {
   // Statut recalcule a chaque rendu, en fonction des dates actuellement saisies
   const statutPreview = calculerStatutPreview(
     formData.date_debut_production,
-    formData.date_mise_disposition,
+    formData.date_mise_disposition
   );
   const statutPreviewColor = statutColorMap[statutPreview] || "secondary";
 
@@ -281,7 +281,7 @@ function Tables() {
   // Num semaine recalcule a chaque rendu : semaine ISO du debut et de la mise a disposition
   const numSemainePreview = calculerNumSemaine(
     formData.date_debut_production,
-    formData.date_mise_disposition,
+    formData.date_mise_disposition
   );
 
   // Récupère l'objet client complet correspondant au nom sélectionné,
@@ -296,8 +296,8 @@ function Tables() {
       const commandes = response.data.data;
       setRows(
         commandes.map((commande) =>
-          formatCommandeRow(commande, { onEdit: handleEdit, onDelete: handleDelete }),
-        ),
+          formatCommandeRow(commande, { onEdit: handleEdit, onDelete: handleDelete })
+        )
       );
     } catch (error) {
       console.error("Erreur lors de la récupération des commandes:", error);
@@ -330,7 +330,7 @@ function Tables() {
     const nouvelleDateFin = calculerDateFinProduction(
       formData.date_debut_production,
       formData.qté_commandé,
-      formData.objectif,
+      formData.objectif
     );
 
     setFormData((prev) => {
@@ -388,7 +388,7 @@ function Tables() {
   // Supprime une commande apres confirmation
   const handleDelete = async (commande) => {
     const confirmation = window.confirm(
-      `Voulez-vous vraiment supprimer la commande "${commande.commande}" ?`,
+      `Voulez-vous vraiment supprimer la commande "${commande.commande}" ?`
     );
     if (!confirmation) return;
 
@@ -479,7 +479,7 @@ function Tables() {
     if (!selectedClientObj) return;
 
     const confirmation = window.confirm(
-      `Voulez-vous vraiment supprimer le client "${selectedClientObj.nom}" ? Cette action est irréversible.`,
+      `Voulez-vous vraiment supprimer le client "${selectedClientObj.nom}" ? Cette action est irréversible.`
     );
     if (!confirmation) return;
 
