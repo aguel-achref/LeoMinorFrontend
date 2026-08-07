@@ -298,17 +298,6 @@ function Configurator() {
             view documentation
           </MDButton>
         </MDBox>
-        <MDBox display="flex" justifyContent="center">
-          <GitHubButton
-            href="https://github.com/creativetimofficial/material-dashboard-react"
-            data-icon="octicon-star"
-            data-size="large"
-            data-show-count="true"
-            aria-label="Star creativetimofficial/material-dashboard-react on GitHub"
-          >
-            Star
-          </GitHubButton>
-        </MDBox>
       </MDBox>
     </ConfiguratorRoot>
   );
