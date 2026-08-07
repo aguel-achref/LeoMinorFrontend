@@ -75,9 +75,12 @@ function ImportCommande({ clients, onImported }) {
 
     setLoading(true);
     try {
-      const response = await api.post("/commandes/importCommandes", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      // Important : ne PAS fixer manuellement "Content-Type": "multipart/form-data"
+      // ici. Le navigateur doit générer lui-même le header avec le bon
+      // "boundary" (ex: multipart/form-data; boundary=----WebKitFormBoundary...),
+      // sinon le serveur (multer) ne peut pas parser le fichier et reçoit
+      // req.file = undefined.
+      const response = await api.post("/commandes/importCommandes", formData);
 
       const { imported, skipped } = response.data;
       setMessageColor("success");
@@ -94,7 +97,9 @@ function ImportCommande({ clients, onImported }) {
     } catch (error) {
       console.error("Erreur lors de l'import des commandes:", error);
       setMessageColor("error");
-      setMessage(error.response?.data?.message || "Erreur lors de l'import du fichier.");
+      setMessage(
+        error.response?.data?.message || "Erreur lors de l'import du fichier."
+      );
     } finally {
       setLoading(false);
     }
@@ -146,8 +151,9 @@ function ImportCommande({ clients, onImported }) {
           </FormControl>
 
           <MDTypography variant="caption" color="text" mt={2} display="block">
-            La chaîne et l&apos;objectif ne sont pas dans le fichier : ils seront laissés vides/à 0
-            et à corriger ensuite ligne par ligne dans le tableau.
+            La chaîne et l&apos;objectif ne sont pas dans le fichier : ils seront
+            laissés vides/à 0 et à corriger ensuite ligne par ligne dans le
+            tableau.
           </MDTypography>
 
           {message && (
