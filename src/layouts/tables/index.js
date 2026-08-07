@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "services/axiosConfig";
 import dayjs from "dayjs";
 
@@ -255,7 +255,11 @@ function calculerDateFinProduction(dateDebutProduction, qteCommande, objectif) {
 
 function Tables() {
   const { columns } = authorsTableData();
-  const [rows, setRows] = useState([]);
+  // Données brutes venant de l'API (pas encore transformées en lignes
+  // DataTable). On dérive "rows" via useMemo ci-dessous, pour que les cases
+  // à cocher se mettent à jour immédiatement quand selectedIds change, sans
+  // avoir à refaire un appel API à chaque clic.
+  const [commandesData, setCommandesData] = useState([]);
   const [loadingTable, setLoadingTable] = useState(true);
 
   const [formData, setFormData] = useState(emptyFormData);
@@ -282,6 +286,45 @@ function Tables() {
   // GET /commandes/getOneCommande/:id des qu'on lui passe un id.
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [editingCommandeId, setEditingCommandeId] = useState(null);
+
+  // --- Sélection multiple (suppression groupée) ---
+  // On garde les commandes brutes (pas juste les ids) le temps de
+  // reconstruire les lignes, mais seuls les ids sont envoyés au backend.
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [deletingSelection, setDeletingSelection] = useState(false);
+
+  const isCommandeSelected = (commande) => selectedIds.includes(commande.id);
+
+  const handleToggleSelect = (commande) => {
+    setSelectedIds((prev) =>
+      prev.includes(commande.id) ? prev.filter((id) => id !== commande.id) : [...prev, commande.id]
+    );
+  };
+
+  const handleClearSelection = () => setSelectedIds([]);
+
+  const handleDeleteSelection = async () => {
+    if (selectedIds.length === 0) return;
+
+    const confirmation = window.confirm(
+      `Voulez-vous vraiment supprimer ${selectedIds.length} commande(s) sélectionnée(s) ? Cette action est irréversible.`
+    );
+    if (!confirmation) return;
+
+    setDeletingSelection(true);
+    try {
+      await api.delete("/commandes/deleteMultipleCommandes", {
+        data: { ids: selectedIds },
+      });
+      setSelectedIds([]);
+      fetchCommandes();
+    } catch (error) {
+      console.error("Erreur lors de la suppression multiple:", error);
+      alert("Erreur lors de la suppression des commandes sélectionnées.");
+    } finally {
+      setDeletingSelection(false);
+    }
+  };
 
   // Statut recalcule a chaque rendu, en fonction des dates actuellement saisies
   const statutPreview = calculerStatutPreview(
@@ -317,11 +360,10 @@ function Tables() {
     try {
       const response = await api.get("/commandes/getAllCommandes/");
       const commandes = response.data.data;
-      setRows(
-        commandes.map((commande) =>
-          formatCommandeRow(commande, { onEdit: handleEdit, onDelete: handleDelete })
-        )
-      );
+      setCommandesData(commandes);
+      // La sélection ne survit pas à un refetch (ex: après suppression) :
+      // les commandes affichées changent, donc on repart d'une sélection vide.
+      setSelectedIds([]);
     } catch (error) {
       console.error("Erreur lors de la récupération des commandes:", error);
     } finally {
@@ -581,6 +623,21 @@ function Tables() {
       setLoading(false);
     }
   };
+
+  // Lignes affichées par DataTable, reconstruites à chaque changement des
+  // données ou de la sélection (cases à cocher) — voir commandesData plus haut.
+  const rows = useMemo(
+    () =>
+      commandesData.map((commande) =>
+        formatCommandeRow(commande, {
+          onEdit: handleEdit,
+          onDelete: handleDelete,
+          isSelected: isCommandeSelected,
+          onToggleSelect: handleToggleSelect,
+        })
+      ),
+    [commandesData, selectedIds]
+  );
 
   // Style custom pour que le champ ressemble à un MDInput
   const datePickerInputStyle = {
@@ -901,7 +958,32 @@ function Tables() {
                 <MDTypography variant="h6" color="white">
                   Commandes
                 </MDTypography>
-                <MDBox display="flex" gap={1}>
+                <MDBox display="flex" alignItems="center" gap={1}>
+                  {selectedIds.length > 0 && (
+                    <>
+                      <MDTypography variant="button" color="white">
+                        {selectedIds.length} sélectionnée(s)
+                      </MDTypography>
+                      <MDButton
+                        variant="outlined"
+                        color="white"
+                        size="small"
+                        onClick={handleDeleteSelection}
+                        disabled={deletingSelection}
+                      >
+                        {deletingSelection ? "Suppression..." : "Supprimer la sélection"}
+                      </MDButton>
+                      <MDButton
+                        variant="text"
+                        color="white"
+                        size="small"
+                        onClick={handleClearSelection}
+                        disabled={deletingSelection}
+                      >
+                        Annuler
+                      </MDButton>
+                    </>
+                  )}
                   <ImportCommande clients={clients} onImported={fetchCommandes} />
                   <ExportCommande />
                 </MDBox>

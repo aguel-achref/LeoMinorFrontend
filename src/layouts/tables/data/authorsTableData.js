@@ -1,4 +1,5 @@
 import PropTypes from "prop-types";
+import Checkbox from "@mui/material/Checkbox";
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
 import MDBadge from "components/MDBadge";
@@ -10,6 +11,7 @@ import Icon from "@mui/material/Icon";
 export default function data() {
   return {
     columns: [
+      { Header: "select", accessor: "select", align: "center" },
       { Header: "chaine", accessor: "chaine", align: "center" },
       { Header: "statut", accessor: "statut", align: "center" },
       { Header: "commande", accessor: "commande", align: "left" },
@@ -95,10 +97,15 @@ export function getStatutBadge(commande) {
 }
 
 // Transforme une commande brute venant de l'API (base SQL) en une ligne
-// affichable par DataTable, avec le badge de statut, le style du dashboard,
-// et les boutons Modifier / Supprimer.
+// affichable par DataTable, avec la case à cocher de sélection, le badge de
+// statut, le style du dashboard, et les boutons Modifier / Supprimer.
+//
+// handlers :
+// - onEdit(commande), onDelete(commande) : inchangés
+// - isSelected(commande) : (commande) => boolean, pour l'état coché/décoché
+// - onToggleSelect(commande) : appelé au clic sur la case à cocher
 export function formatCommandeRow(commande, handlers = {}) {
-  const { onEdit, onDelete } = handlers;
+  const { onEdit, onDelete, isSelected, onToggleSelect } = handlers;
   const { label, color } = getStatutBadge(commande);
 
   const Cell = ({ value }) => (
@@ -116,6 +123,15 @@ export function formatCommandeRow(commande, handlers = {}) {
   };
 
   return {
+    select: (
+      <Checkbox
+        checked={isSelected ? isSelected(commande) : false}
+        onChange={() => {
+          if (onToggleSelect) onToggleSelect(commande);
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    ),
     chaine: <Cell value={commande.chaine} />,
     statut: (
       <MDBox ml={-1}>
