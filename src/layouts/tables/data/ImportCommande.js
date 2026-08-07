@@ -86,7 +86,9 @@ function ImportCommande({ clients, onImported }) {
       setMessageColor("success");
       setMessage(
         `${imported} commande(s) importée(s)` +
-          (skipped ? `, ${skipped} ligne(s) ignorée(s) (dates manquantes).` : ".")
+          (skipped
+            ? `, ${skipped} ligne(s) ignorée(s) (dates manquantes).`
+            : "."),
       );
 
       if (onImported) onImported();
@@ -98,7 +100,7 @@ function ImportCommande({ clients, onImported }) {
       console.error("Erreur lors de l'import des commandes:", error);
       setMessageColor("error");
       setMessage(
-        error.response?.data?.message || "Erreur lors de l'import du fichier."
+        error.response?.data?.message || "Erreur lors de l'import du fichier.",
       );
     } finally {
       setLoading(false);
@@ -121,7 +123,12 @@ function ImportCommande({ clients, onImported }) {
         <DialogTitle>Importer des commandes depuis Excel</DialogTitle>
         <DialogContent>
           <MDBox mb={3} mt={1}>
-            <MDTypography variant="caption" color="text" mb={0.5} display="block">
+            <MDTypography
+              variant="caption"
+              color="text"
+              mb={0.5}
+              display="block"
+            >
               Fichier Excel (.xlsx)
             </MDTypography>
             <input
@@ -151,22 +158,37 @@ function ImportCommande({ clients, onImported }) {
           </FormControl>
 
           <MDTypography variant="caption" color="text" mt={2} display="block">
-            La chaîne et l&apos;objectif ne sont pas dans le fichier : ils seront
-            laissés vides/à 0 et à corriger ensuite ligne par ligne dans le
-            tableau.
+            La chaîne et l&apos;objectif ne sont pas dans le fichier : ils
+            seront laissés vides/à 0 et à corriger ensuite ligne par ligne dans
+            le tableau.
           </MDTypography>
 
           {message && (
-            <MDTypography variant="button" color={messageColor} mt={2} display="block">
+            <MDTypography
+              variant="button"
+              color={messageColor}
+              mt={2}
+              display="block"
+            >
               {message}
             </MDTypography>
           )}
         </DialogContent>
         <DialogActions>
-          <MDButton variant="outlined" color="dark" onClick={handleClose} disabled={loading}>
+          <MDButton
+            variant="outlined"
+            color="dark"
+            onClick={handleClose}
+            disabled={loading}
+          >
             Annuler
           </MDButton>
-          <MDButton variant="gradient" color="info" onClick={handleSubmit} disabled={loading}>
+          <MDButton
+            variant="gradient"
+            color="info"
+            onClick={handleSubmit}
+            disabled={loading}
+          >
             {loading ? "Import en cours..." : "Importer"}
           </MDButton>
         </DialogActions>
@@ -180,7 +202,7 @@ ImportCommande.propTypes = {
     PropTypes.shape({
       id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
       nom: PropTypes.string,
-    })
+    }),
   ).isRequired,
   onImported: PropTypes.func,
 };
