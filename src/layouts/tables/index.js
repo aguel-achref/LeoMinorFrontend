@@ -33,7 +33,10 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import DataTable from "examples/Tables/DataTable";
 
 // Data
-import authorsTableData, { formatCommandeRow } from "layouts/tables/data/authorsTableData";
+import authorsTableData, {
+  formatCommandeRow,
+  getStatutBadge,
+} from "layouts/tables/data/authorsTableData";
 
 // Popup d'édition (fichier externe) : fetch getOneCommande/:id + formulaire + update
 import UpdateCommandeModal from "layouts/tables/data/UpdateCommandeModal";
@@ -325,6 +328,47 @@ function Tables() {
       setDeletingSelection(false);
     }
   };
+
+  // --- Filtres du tableau (client / chaîne / statut) ---
+  // "" = pas de filtre sur ce champ (toutes les valeurs)
+  const [filterClient, setFilterClient] = useState("");
+  const [filterChaine, setFilterChaine] = useState("");
+  const [filterStatut, setFilterStatut] = useState("");
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "filterClient") setFilterClient(value);
+    if (name === "filterChaine") setFilterChaine(value);
+    if (name === "filterStatut") setFilterStatut(value);
+  };
+
+  const handleResetFilters = () => {
+    setFilterClient("");
+    setFilterChaine("");
+    setFilterStatut("");
+  };
+
+  // Liste des clients distincts réellement présents dans les commandes
+  // (peut différer de la liste "clients" du formulaire, qui contient tous
+  // les clients enregistrés même sans commande en cours).
+  const filterClientOptions = useMemo(() => {
+    const noms = commandesData.map((c) => c.client).filter(Boolean);
+    return Array.from(new Set(noms)).sort();
+  }, [commandesData]);
+
+  const statutOptions = Object.keys(statutColorMap);
+
+  // Commandes après application des 3 filtres. Le statut est recalculé en
+  // direct via getStatutBadge (mêmes règles que le badge affiché dans le
+  // tableau), pas la valeur "statut" figée en base au moment de la création.
+  const filteredCommandesData = useMemo(() => {
+    return commandesData.filter((commande) => {
+      if (filterClient && commande.client !== filterClient) return false;
+      if (filterChaine && commande.chaine !== filterChaine) return false;
+      if (filterStatut && getStatutBadge(commande).label !== filterStatut) return false;
+      return true;
+    });
+  }, [commandesData, filterClient, filterChaine, filterStatut]);
 
   // Statut recalcule a chaque rendu, en fonction des dates actuellement saisies
   const statutPreview = calculerStatutPreview(
@@ -625,10 +669,10 @@ function Tables() {
   };
 
   // Lignes affichées par DataTable, reconstruites à chaque changement des
-  // données ou de la sélection (cases à cocher) — voir commandesData plus haut.
+  // données, des filtres, ou de la sélection (cases à cocher).
   const rows = useMemo(
     () =>
-      commandesData.map((commande) =>
+      filteredCommandesData.map((commande) =>
         formatCommandeRow(commande, {
           onEdit: handleEdit,
           onDelete: handleDelete,
@@ -636,7 +680,7 @@ function Tables() {
           onToggleSelect: handleToggleSelect,
         })
       ),
-    [commandesData, selectedIds]
+    [filteredCommandesData, selectedIds]
   );
 
   // Style custom pour que le champ ressemble à un MDInput
@@ -988,6 +1032,92 @@ function Tables() {
                   <ExportCommande />
                 </MDBox>
               </MDBox>
+
+              {/* --- Barre de filtres : client / chaîne / statut --- */}
+              <MDBox px={2} pt={3}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={4} md={3}>
+                    <FormControl fullWidth>
+                      <InputLabel id="filter-client-label">Client</InputLabel>
+                      <Select
+                        labelId="filter-client-label"
+                        label="Client"
+                        name="filterClient"
+                        value={filterClient}
+                        onChange={handleFilterChange}
+                        sx={{ height: "45px" }}
+                      >
+                        <MenuItem value="">Tous</MenuItem>
+                        {filterClientOptions.map((nom) => (
+                          <MenuItem key={nom} value={nom}>
+                            {nom}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} sm={4} md={3}>
+                    <FormControl fullWidth>
+                      <InputLabel id="filter-chaine-label">Chaîne</InputLabel>
+                      <Select
+                        labelId="filter-chaine-label"
+                        label="Chaîne"
+                        name="filterChaine"
+                        value={filterChaine}
+                        onChange={handleFilterChange}
+                        sx={{ height: "45px" }}
+                      >
+                        <MenuItem value="">Toutes</MenuItem>
+                        {chaineOptions.map((option) => (
+                          <MenuItem key={option} value={option}>
+                            {option}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} sm={4} md={3}>
+                    <FormControl fullWidth>
+                      <InputLabel id="filter-statut-label">Statut</InputLabel>
+                      <Select
+                        labelId="filter-statut-label"
+                        label="Statut"
+                        name="filterStatut"
+                        value={filterStatut}
+                        onChange={handleFilterChange}
+                        sx={{ height: "45px" }}
+                      >
+                        <MenuItem value="">Tous</MenuItem>
+                        {statutOptions.map((statut) => (
+                          <MenuItem key={statut} value={statut}>
+                            {statut}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} md={3}>
+                    <MDBox display="flex" alignItems="center" gap={2}>
+                      <MDButton
+                        variant="text"
+                        color="dark"
+                        size="small"
+                        onClick={handleResetFilters}
+                        disabled={!filterClient && !filterChaine && !filterStatut}
+                      >
+                        Réinitialiser les filtres
+                      </MDButton>
+                      <MDTypography variant="caption" color="text">
+                        {filteredCommandesData.length} commande(s)
+                      </MDTypography>
+                    </MDBox>
+                  </Grid>
+                </Grid>
+              </MDBox>
+
               <MDBox pt={3}>
                 {loadingTable ? (
                   <MDBox p={3} textAlign="center">
