@@ -1,73 +1,124 @@
 /**
 =========================================================
-* Material Dashboard 2 React - v2.2.0
+* Material Dashboard 2 React - v2.2.0 (version connectée)
 =========================================================
-
-* Product Page: https://www.creative-tim.com/product/material-dashboard-react
-* Copyright 2023 Creative Tim (https://www.creative-tim.com)
-
-Coded by www.creative-tim.com
-
- =========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+* Adapté pour afficher les statistiques réelles des commandes/clients
+* via l'endpoint GET /api/dashboard/summary.
 */
+
+import { useEffect, useState } from "react";
 
 // @mui material components
 import Grid from "@mui/material/Grid";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
+import MDTypography from "components/MDTypography";
 
 // Material Dashboard 2 React example components
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import ReportsBarChart from "examples/Charts/BarCharts/ReportsBarChart";
-import ReportsLineChart from "examples/Charts/LineCharts/ReportsLineChart";
 import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatisticsCard";
 
-// Data
-import reportsBarChartData from "layouts/dashboard/data/reportsBarChartData";
-import reportsLineChartData from "layouts/dashboard/data/reportsLineChartData";
-
-// Dashboard components
-import Projects from "layouts/dashboard/components/Projects";
-import OrdersOverview from "layouts/dashboard/components/OrdersOverview";
+// Dashboard data helpers
+import { fetchDashboardSummary } from "services/dashboardService";
+import { toChartFormat } from "layouts/dashboard/data/chartAdapters";
 
 function Dashboard() {
-  const { sales, tasks } = reportsLineChartData;
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSummary() {
+      try {
+        const data = await fetchDashboardSummary();
+        if (isMounted) setSummary(data);
+      } catch (err) {
+        console.error("Erreur chargement dashboard:", err);
+        if (isMounted) setError("Impossible de charger les données du dashboard.");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadSummary();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <DashboardNavbar />
+        <MDBox py={3} textAlign="center">
+          <MDTypography variant="body2" color="text">
+            Chargement du dashboard...
+          </MDTypography>
+        </MDBox>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <DashboardNavbar />
+        <MDBox py={3} textAlign="center">
+          <MDTypography variant="body2" color="error">
+            {error}
+          </MDTypography>
+        </MDBox>
+      </DashboardLayout>
+    );
+  }
+
+  const {
+    totalCommandes,
+    totalClients,
+    commandesParStatut,
+    commandesParClient,
+    commandesParChaine,
+    commandesAlerte,
+  } = summary;
 
   return (
     <DashboardLayout>
       <DashboardNavbar />
       <MDBox py={3}>
+        {/* Cards de statistiques globales */}
         <Grid container spacing={3}>
           <Grid item xs={12} md={6} lg={3}>
             <MDBox mb={1.5}>
               <ComplexStatisticsCard
                 color="dark"
-                icon="weekend"
-                title="Bookings"
-                count={281}
-                percentage={{
-                  color: "success",
-                  amount: "+55%",
-                  label: "than lask week",
-                }}
+                icon="assignment"
+                title="Total commandes"
+                count={totalCommandes}
               />
             </MDBox>
           </Grid>
           <Grid item xs={12} md={6} lg={3}>
             <MDBox mb={1.5}>
               <ComplexStatisticsCard
-                icon="leaderboard"
-                title="Today's Users"
-                count="2,300"
-                percentage={{
-                  color: "success",
-                  amount: "+3%",
-                  label: "than last month",
-                }}
+                color="info"
+                icon="group"
+                title="Total clients"
+                count={totalClients}
+              />
+            </MDBox>
+          </Grid>
+          <Grid item xs={12} md={6} lg={3}>
+            <MDBox mb={1.5}>
+              <ComplexStatisticsCard
+                color="warning"
+                icon="warning"
+                title="Commandes en alerte"
+                count={commandesAlerte.length}
               />
             </MDBox>
           </Grid>
@@ -75,81 +126,49 @@ function Dashboard() {
             <MDBox mb={1.5}>
               <ComplexStatisticsCard
                 color="success"
-                icon="store"
-                title="Revenue"
-                count="34k"
-                percentage={{
-                  color: "success",
-                  amount: "+1%",
-                  label: "than yesterday",
-                }}
-              />
-            </MDBox>
-          </Grid>
-          <Grid item xs={12} md={6} lg={3}>
-            <MDBox mb={1.5}>
-              <ComplexStatisticsCard
-                color="primary"
-                icon="person_add"
-                title="Followers"
-                count="+91"
-                percentage={{
-                  color: "success",
-                  amount: "",
-                  label: "Just updated",
-                }}
+                icon="precision_manufacturing"
+                title="Chaînes actives"
+                count={commandesParChaine.length}
               />
             </MDBox>
           </Grid>
         </Grid>
+
+        {/* Graphiques de répartition */}
         <MDBox mt={4.5}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6} lg={4}>
               <MDBox mb={3}>
                 <ReportsBarChart
                   color="info"
-                  title="website views"
-                  description="Last Campaign Performance"
-                  date="campaign sent 2 days ago"
-                  chart={reportsBarChartData}
+                  title="Commandes par statut"
+                  description="Répartition actuelle"
+                  date="mis à jour à l'instant"
+                  chart={toChartFormat(commandesParStatut, "Commandes")}
                 />
               </MDBox>
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
               <MDBox mb={3}>
-                <ReportsLineChart
+                <ReportsBarChart
                   color="success"
-                  title="daily sales"
-                  description={
-                    <>
-                      (<strong>+15%</strong>) increase in today sales.
-                    </>
-                  }
-                  date="updated 4 min ago"
-                  chart={sales}
+                  title="Commandes par client"
+                  description="Top clients par volume"
+                  date="mis à jour à l'instant"
+                  chart={toChartFormat(commandesParClient, "Commandes")}
                 />
               </MDBox>
             </Grid>
             <Grid item xs={12} md={6} lg={4}>
               <MDBox mb={3}>
-                <ReportsLineChart
+                <ReportsBarChart
                   color="dark"
-                  title="completed tasks"
-                  description="Last Campaign Performance"
-                  date="just updated"
-                  chart={tasks}
+                  title="Commandes par chaîne"
+                  description="Charge de production"
+                  date="mis à jour à l'instant"
+                  chart={toChartFormat(commandesParChaine, "Commandes")}
                 />
               </MDBox>
-            </Grid>
-          </Grid>
-        </MDBox>
-        <MDBox>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6} lg={8}>
-              <Projects />
-            </Grid>
-            <Grid item xs={12} md={6} lg={4}>
-              <OrdersOverview />
             </Grid>
           </Grid>
         </MDBox>
