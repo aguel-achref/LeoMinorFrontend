@@ -83,6 +83,7 @@ function Dashboard() {
     commandesParStatut,
     commandesParClient,
     commandesParChaine,
+    heuresParClient,
     commandesAlerte,
   } = summary;
 
@@ -167,6 +168,23 @@ function Dashboard() {
                   description="Charge de production"
                   date="mis à jour à l'instant"
                   chart={toChartFormat(commandesParChaine, "Commandes")}
+                />
+              </MDBox>
+            </Grid>
+          </Grid>
+        </MDBox>
+
+        {/* Dashboard dédié : heures totales de production par client */}
+        <MDBox mt={4.5}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <MDBox mb={3}>
+                <ReportsBarChart
+                  color="info"
+                  title="Heures totales de production par client"
+                  description="Charge de travail estimée (nombre_heure cumulé)"
+                  date="mis à jour à l'instant"
+                  chart={toChartFormat(heuresParClient, "Heures", "total")}
                 />
               </MDBox>
             </Grid>
