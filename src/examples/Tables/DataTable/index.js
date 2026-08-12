@@ -56,7 +56,19 @@ function DataTable({
   const data = useMemo(() => table.rows, [table]);
 
   const tableInstance = useTable(
-    { columns, data, initialState: { pageIndex: 0 } },
+    {
+      columns,
+      data,
+      initialState: { pageIndex: 0 },
+      // Sans ça, react-table remet automatiquement pageIndex à 0 dès que
+      // "data" change de référence (ex: cocher une checkbox qui recalcule
+      // "rows" via useMemo dans Tables.js) -> on perd la page courante.
+      autoResetPage: false,
+      autoResetSortBy: false,
+      autoResetFilters: false,
+      autoResetGlobalFilter: false,
+      autoResetRowState: false,
+    },
     useGlobalFilter,
     useSortBy,
     usePagination
