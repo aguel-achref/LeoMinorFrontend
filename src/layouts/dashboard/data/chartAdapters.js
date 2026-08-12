@@ -8,11 +8,13 @@
  * @param {string} [valueKey="count"] - nom du champ numérique à extraire (ex: "count" ou "total")
  */
 export function toChartFormat(groupedData, datasetLabel, valueKey = "count") {
+  const data = Array.isArray(groupedData) ? groupedData : [];
+
   return {
-    labels: groupedData.map((item) => item.label),
+    labels: data.map((item) => item.label),
     datasets: {
       label: datasetLabel,
-      data: groupedData.map((item) => item[valueKey]),
+      data: data.map((item) => item[valueKey]),
     },
   };
 }
