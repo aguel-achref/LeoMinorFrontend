@@ -113,9 +113,9 @@ function Header({ children }) {
               <MDTypography variant="h5" fontWeight="medium">
                 {loadingUser ? "Chargement..." : fullName || "Utilisateur"}
               </MDTypography>
-              {currentUser?.email && (
+              {currentUser?.status && (
                 <MDTypography variant="button" color="text" fontWeight="regular">
-                  {currentUser.email}
+                  {currentUser.status}
                 </MDTypography>
               )}
             </MDBox>
