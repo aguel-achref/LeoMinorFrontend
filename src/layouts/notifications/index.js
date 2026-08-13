@@ -69,60 +69,6 @@ function Notifications() {
     };
   }, []);
 
-  const renderSuccessSB = (
-    <MDSnackbar
-      color="success"
-      icon="check"
-      title="Material Dashboard"
-      content="Hello, world! This is a notification message"
-      dateTime="11 mins ago"
-      open={successSB}
-      onClose={closeSuccessSB}
-      close={closeSuccessSB}
-      bgWhite
-    />
-  );
-
-  const renderInfoSB = (
-    <MDSnackbar
-      icon="notifications"
-      title="Material Dashboard"
-      content="Hello, world! This is a notification message"
-      dateTime="11 mins ago"
-      open={infoSB}
-      onClose={closeInfoSB}
-      close={closeInfoSB}
-    />
-  );
-
-  const renderWarningSB = (
-    <MDSnackbar
-      color="warning"
-      icon="star"
-      title="Material Dashboard"
-      content="Hello, world! This is a notification message"
-      dateTime="11 mins ago"
-      open={warningSB}
-      onClose={closeWarningSB}
-      close={closeWarningSB}
-      bgWhite
-    />
-  );
-
-  const renderErrorSB = (
-    <MDSnackbar
-      color="error"
-      icon="warning"
-      title="Material Dashboard"
-      content="Hello, world! This is a notification message"
-      dateTime="11 mins ago"
-      open={errorSB}
-      onClose={closeErrorSB}
-      close={closeErrorSB}
-      bgWhite
-    />
-  );
-
   return (
     <DashboardLayout>
       <DashboardNavbar />
