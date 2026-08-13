@@ -13,6 +13,7 @@ import IconButton from "@mui/material/IconButton";
 import Menu from "@mui/material/Menu";
 import Icon from "@mui/material/Icon";
 import Badge from "@mui/material/Badge";
+import Divider from "@mui/material/Divider";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -44,14 +45,15 @@ import {
 // pour garder une seule source de vérité pour les commandes en alerte.
 import { fetchDashboardSummary } from "services/dashboardService";
 
-// Décode le JWT stocké pour récupérer le prénom de l'utilisateur connecté
-import { getConnectedUserFirstName } from "utils/decodeToken";
+// Infos de l'utilisateur connecté, récupérées via GET /users/me
+import { fetchCurrentUser } from "services/userService";
 
 function DashboardNavbar({ absolute, light, isMini }) {
   const [navbarType, setNavbarType] = useState();
   const [controller, dispatch] = useMaterialUIController();
   const { miniSidenav, transparentNavbar, fixedNavbar, openConfigurator, darkMode } = controller;
   const [openMenu, setOpenMenu] = useState(false);
+  const [openAccountMenu, setOpenAccountMenu] = useState(false);
   const route = useLocation().pathname.split("/").slice(1);
   const navigate = useNavigate();
 
@@ -60,10 +62,9 @@ function DashboardNavbar({ absolute, light, isMini }) {
   const [commandesAlerte, setCommandesAlerte] = useState([]);
   const [loadingAlertes, setLoadingAlertes] = useState(true);
 
-  // Prénom de l'utilisateur connecté, lu depuis le JWT au montage. Pas
-  // besoin de useEffect : le token ne change pas pendant la session, donc
-  // un calcul direct au rendu suffit (relit le token si la page est rechargée).
-  const firstName = getConnectedUserFirstName();
+  // Utilisateur connecté, affiché dans le menu déroulant du compte
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -81,9 +82,21 @@ function DashboardNavbar({ absolute, light, isMini }) {
       }
     }
 
+    async function loadCurrentUser() {
+      try {
+        const user = await fetchCurrentUser();
+        if (isMounted) setCurrentUser(user);
+      } catch (error) {
+        console.error("Erreur lors de la récupération de l'utilisateur connecté:", error);
+      } finally {
+        if (isMounted) setLoadingUser(false);
+      }
+    }
+
     loadAlertes();
-    // Rafraîchit automatiquement toutes les 5 minutes pour rester à jour
-    // sans que l'utilisateur ait à recharger la page.
+    loadCurrentUser();
+
+    // Rafraîchit automatiquement les alertes toutes les 5 minutes
     const intervalId = setInterval(loadAlertes, 5 * 60 * 1000);
 
     return () => {
@@ -122,12 +135,19 @@ function DashboardNavbar({ absolute, light, isMini }) {
   const handleConfiguratorOpen = () => setOpenConfigurator(dispatch, !openConfigurator);
   const handleOpenMenu = (event) => setOpenMenu(event.currentTarget);
   const handleCloseMenu = () => setOpenMenu(false);
+  const handleOpenAccountMenu = (event) => setOpenAccountMenu(event.currentTarget);
+  const handleCloseAccountMenu = () => setOpenAccountMenu(false);
 
   // Clique sur une alerte du menu -> ferme le menu et va vers la page
   // Notifications, qui liste ces mêmes commandes en détail.
   const handleClickAlerte = () => {
     handleCloseMenu();
     navigate("/notifications");
+  };
+
+  const handleGoToProfile = () => {
+    handleCloseAccountMenu();
+    navigate("/profile");
   };
 
   // Render the notifications menu : une entrée rouge par commande en
@@ -161,6 +181,51 @@ function DashboardNavbar({ absolute, light, isMini }) {
     </Menu>
   );
 
+  // Render du menu déroulant du compte : prénom + nom de l'utilisateur
+  // connecté, avec un lien vers le profil complet.
+  const renderAccountMenu = () => (
+    <Menu
+      anchorEl={openAccountMenu}
+      anchorReference={null}
+      anchorOrigin={{
+        vertical: "bottom",
+        horizontal: "left",
+      }}
+      open={Boolean(openAccountMenu)}
+      onClose={handleCloseAccountMenu}
+      sx={{ mt: 2 }}
+    >
+      <MDBox px={2} py={1} minWidth="200px">
+        {loadingUser ? (
+          <MDTypography variant="button" color="text">
+            Chargement...
+          </MDTypography>
+        ) : currentUser ? (
+          <>
+            <MDTypography variant="button" fontWeight="bold" display="block">
+              {currentUser.first_name} {currentUser.last_name}
+            </MDTypography>
+            {currentUser.email && (
+              <MDTypography variant="caption" color="text" display="block">
+                {currentUser.email}
+              </MDTypography>
+            )}
+          </>
+        ) : (
+          <MDTypography variant="button" color="error">
+            Utilisateur introuvable
+          </MDTypography>
+        )}
+      </MDBox>
+      <Divider sx={{ my: 0.5 }} />
+      <NotificationItem
+        icon={<Icon>person</Icon>}
+        title="Voir le profil"
+        onClick={handleGoToProfile}
+      />
+    </Menu>
+  );
+
   // Styles for the navbar icons
   const iconsStyle = ({ palette: { dark, white, text }, functions: { rgba } }) => ({
     color: () => {
@@ -187,25 +252,18 @@ function DashboardNavbar({ absolute, light, isMini }) {
         {isMini ? null : (
           <MDBox sx={(theme) => navbarRow(theme, { isMini })}>
             <MDBox color={light ? "white" : "inherit"}>
-              {/* Compte connecté : icône + prénom (si disponible), lien vers le profil */}
-              <Link to="/profile">
-                <MDBox display="flex" alignItems="center" sx={{ cursor: "pointer" }}>
-                  <IconButton sx={navbarIconButton} size="small" disableRipple>
-                    <Icon sx={iconsStyle}>account_circle</Icon>
-                  </IconButton>
-                  {firstName && (
-                    <MDTypography
-                      variant="button"
-                      fontWeight="medium"
-                      sx={iconsStyle}
-                      ml={-0.5}
-                      mr={1}
-                    >
-                      {firstName}
-                    </MDTypography>
-                  )}
-                </MDBox>
-              </Link>
+              {/* Compte connecté : clic -> menu déroulant avec prénom + nom */}
+              <IconButton
+                sx={navbarIconButton}
+                size="small"
+                disableRipple
+                aria-controls="account-menu"
+                aria-haspopup="true"
+                onClick={handleOpenAccountMenu}
+              >
+                <Icon sx={iconsStyle}>account_circle</Icon>
+              </IconButton>
+              {renderAccountMenu()}
               <IconButton
                 size="small"
                 disableRipple
