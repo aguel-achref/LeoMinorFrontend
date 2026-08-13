@@ -44,6 +44,9 @@ import {
 // pour garder une seule source de vérité pour les commandes en alerte.
 import { fetchDashboardSummary } from "services/dashboardService";
 
+// Décode le JWT stocké pour récupérer le prénom de l'utilisateur connecté
+import { getConnectedUserFirstName } from "utils/decodeToken";
+
 function DashboardNavbar({ absolute, light, isMini }) {
   const [navbarType, setNavbarType] = useState();
   const [controller, dispatch] = useMaterialUIController();
@@ -56,6 +59,11 @@ function DashboardNavbar({ absolute, light, isMini }) {
   // menu déroulant de notifications (icône cloche).
   const [commandesAlerte, setCommandesAlerte] = useState([]);
   const [loadingAlertes, setLoadingAlertes] = useState(true);
+
+  // Prénom de l'utilisateur connecté, lu depuis le JWT au montage. Pas
+  // besoin de useEffect : le token ne change pas pendant la session, donc
+  // un calcul direct au rendu suffit (relit le token si la page est rechargée).
+  const firstName = getConnectedUserFirstName();
 
   useEffect(() => {
     let isMounted = true;
@@ -179,10 +187,24 @@ function DashboardNavbar({ absolute, light, isMini }) {
         {isMini ? null : (
           <MDBox sx={(theme) => navbarRow(theme, { isMini })}>
             <MDBox color={light ? "white" : "inherit"}>
-              <Link to="/authentication/sign-in/basic">
-                <IconButton sx={navbarIconButton} size="small" disableRipple>
-                  <Icon sx={iconsStyle}>account_circle</Icon>
-                </IconButton>
+              {/* Compte connecté : icône + prénom (si disponible), lien vers le profil */}
+              <Link to="/profile">
+                <MDBox display="flex" alignItems="center" sx={{ cursor: "pointer" }}>
+                  <IconButton sx={navbarIconButton} size="small" disableRipple>
+                    <Icon sx={iconsStyle}>account_circle</Icon>
+                  </IconButton>
+                  {firstName && (
+                    <MDTypography
+                      variant="button"
+                      fontWeight="medium"
+                      sx={iconsStyle}
+                      ml={-0.5}
+                      mr={1}
+                    >
+                      {firstName}
+                    </MDTypography>
+                  )}
+                </MDBox>
               </Link>
               <IconButton
                 size="small"
