@@ -1,18 +1,3 @@
-/**
-=========================================================
-* Material Dashboard 2 React - v2.2.0
-=========================================================
-
-* Product Page: https://www.creative-tim.com/product/material-dashboard-react
-* Copyright 2023 Creative Tim (https://www.creative-tim.com)
-
-Coded by www.creative-tim.com
-
- =========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-*/
-
 import { useState, useEffect } from "react";
 
 // prop-types is a library for typechecking of props.
@@ -38,9 +23,17 @@ import breakpoints from "assets/theme/base/breakpoints";
 import burceMars from "assets/images/bruce-mars.jpg";
 import backgroundImage from "assets/images/bg-profile.jpeg";
 
+// Infos de l'utilisateur connecté, récupérées via GET /users/me
+import { fetchCurrentUser } from "services/userService";
+
 function Header({ children }) {
   const [tabsOrientation, setTabsOrientation] = useState("horizontal");
   const [tabValue, setTabValue] = useState(0);
+
+  // Utilisateur connecté, affiché en haut du profil à la place du mock
+  // "Richard Davis". Chargé indépendamment du contenu passé en children.
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
   useEffect(() => {
     // A function that sets the orientation state of the tabs.
@@ -62,7 +55,31 @@ function Header({ children }) {
     return () => window.removeEventListener("resize", handleTabsOrientation);
   }, [tabsOrientation]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCurrentUser() {
+      try {
+        const user = await fetchCurrentUser();
+        if (isMounted) setCurrentUser(user);
+      } catch (error) {
+        console.error("Erreur lors de la récupération de l'utilisateur connecté:", error);
+      } finally {
+        if (isMounted) setLoadingUser(false);
+      }
+    }
+
+    loadCurrentUser();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleSetTabValue = (event, newValue) => setTabValue(newValue);
+
+  const fullName = currentUser
+    ? `${currentUser.first_name || ""} ${currentUser.last_name || ""}`.trim()
+    : "";
 
   return (
     <MDBox position="relative" mb={5}>
@@ -99,11 +116,13 @@ function Header({ children }) {
           <Grid item>
             <MDBox height="100%" mt={0.5} lineHeight={1}>
               <MDTypography variant="h5" fontWeight="medium">
-                Richard Davis
+                {loadingUser ? "Chargement..." : fullName || "Utilisateur"}
               </MDTypography>
-              <MDTypography variant="button" color="text" fontWeight="regular">
-                CEO / Co-Founder
-              </MDTypography>
+              {currentUser?.email && (
+                <MDTypography variant="button" color="text" fontWeight="regular">
+                  {currentUser.email}
+                </MDTypography>
+              )}
             </MDBox>
           </Grid>
           <Grid item xs={12} md={6} lg={4} sx={{ ml: "auto" }}>
