@@ -1,22 +1,7 @@
-/**
-=========================================================
-* Material Dashboard 2 React - v2.2.0
-=========================================================
-
-* Product Page: https://www.creative-tim.com/product/material-dashboard-react
-* Copyright 2023 Creative Tim (https://www.creative-tim.com)
-
-Coded by www.creative-tim.com
-
- =========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-*/
-
 import { useState, useEffect } from "react";
 
 // react-router components
-import { useLocation, Link } from "react-router-dom";
+import { useLocation, Link, useNavigate } from "react-router-dom";
 
 // prop-types is a library for typechecking of props.
 import PropTypes from "prop-types";
@@ -27,10 +12,12 @@ import Toolbar from "@mui/material/Toolbar";
 import IconButton from "@mui/material/IconButton";
 import Menu from "@mui/material/Menu";
 import Icon from "@mui/material/Icon";
+import Badge from "@mui/material/Badge";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
 import MDInput from "components/MDInput";
+import MDTypography from "components/MDTypography";
 
 // Material Dashboard 2 React example components
 import Breadcrumbs from "examples/Breadcrumbs";
@@ -53,12 +40,49 @@ import {
   setOpenConfigurator,
 } from "context";
 
+// Réutilise le même endpoint dashboard/summary que la page Notifications,
+// pour garder une seule source de vérité pour les commandes en alerte.
+import { fetchDashboardSummary } from "services/dashboardService";
+
 function DashboardNavbar({ absolute, light, isMini }) {
   const [navbarType, setNavbarType] = useState();
   const [controller, dispatch] = useMaterialUIController();
   const { miniSidenav, transparentNavbar, fixedNavbar, openConfigurator, darkMode } = controller;
   const [openMenu, setOpenMenu] = useState(false);
   const route = useLocation().pathname.split("/").slice(1);
+  const navigate = useNavigate();
+
+  // Commandes dont le statut est exactement "Alerte", affichées dans le
+  // menu déroulant de notifications (icône cloche).
+  const [commandesAlerte, setCommandesAlerte] = useState([]);
+  const [loadingAlertes, setLoadingAlertes] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAlertes() {
+      try {
+        const summary = await fetchDashboardSummary();
+        const toutes = Array.isArray(summary?.commandesAlerte) ? summary.commandesAlerte : [];
+        const alertesUniquement = toutes.filter((c) => c.statut === "Alerte");
+        if (isMounted) setCommandesAlerte(alertesUniquement);
+      } catch (error) {
+        console.error("Erreur lors de la récupération des alertes (navbar):", error);
+      } finally {
+        if (isMounted) setLoadingAlertes(false);
+      }
+    }
+
+    loadAlertes();
+    // Rafraîchit automatiquement toutes les 5 minutes pour rester à jour
+    // sans que l'utilisateur ait à recharger la page.
+    const intervalId = setInterval(loadAlertes, 5 * 60 * 1000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     // Setting the navbar type
@@ -91,7 +115,15 @@ function DashboardNavbar({ absolute, light, isMini }) {
   const handleOpenMenu = (event) => setOpenMenu(event.currentTarget);
   const handleCloseMenu = () => setOpenMenu(false);
 
-  // Render the notifications menu
+  // Clique sur une alerte du menu -> ferme le menu et va vers la page
+  // Notifications, qui liste ces mêmes commandes en détail.
+  const handleClickAlerte = () => {
+    handleCloseMenu();
+    navigate("/notifications");
+  };
+
+  // Render the notifications menu : une entrée rouge par commande en
+  // alerte, ou un message neutre s'il n'y en a aucune.
   const renderMenu = () => (
     <Menu
       anchorEl={openMenu}
@@ -104,7 +136,20 @@ function DashboardNavbar({ absolute, light, isMini }) {
       onClose={handleCloseMenu}
       sx={{ mt: 2 }}
     >
-      <NotificationItem icon={<Icon>email</Icon>} title="Check new messages" />
+      {loadingAlertes ? (
+        <NotificationItem icon={<Icon>hourglass_empty</Icon>} title="Chargement..." />
+      ) : commandesAlerte.length === 0 ? (
+        <NotificationItem icon={<Icon color="success">check_circle</Icon>} title="Aucune alerte" />
+      ) : (
+        commandesAlerte.map((commande) => (
+          <NotificationItem
+            key={commande.id}
+            icon={<Icon color="error">warning</Icon>}
+            title={`${commande.client} — commande n° ${commande.commande}`}
+            onClick={handleClickAlerte}
+          />
+        ))
+      )}
     </Menu>
   );
 
@@ -172,7 +217,9 @@ function DashboardNavbar({ absolute, light, isMini }) {
                 variant="contained"
                 onClick={handleOpenMenu}
               >
-                <Icon sx={iconsStyle}>notifications</Icon>
+                <Badge badgeContent={commandesAlerte.length} color="error" overlap="circular">
+                  <Icon sx={iconsStyle}>notifications</Icon>
+                </Badge>
               </IconButton>
               {renderMenu()}
             </MDBox>
