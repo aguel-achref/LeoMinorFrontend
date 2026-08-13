@@ -1,19 +1,5 @@
-/**
-=========================================================
-* Material Dashboard 2 React - v2.2.0
-=========================================================
-
-* Product Page: https://www.creative-tim.com/product/material-dashboard-react
-* Copyright 2023 Creative Tim (https://www.creative-tim.com)
-
-Coded by www.creative-tim.com
-
- =========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-*/
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "services/axiosConfig";
 
 // @mui material components
 import Grid from "@mui/material/Grid";
@@ -30,11 +16,19 @@ import MDSnackbar from "components/MDSnackbar";
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 
+// Même logique de calcul de statut que dans le tableau des commandes,
+// réutilisée ici pour ne garder que les commandes réellement en "Alerte".
+import { getStatutBadge } from "layouts/tables/data/authorsTableData";
+
 function Notifications() {
   const [successSB, setSuccessSB] = useState(false);
   const [infoSB, setInfoSB] = useState(false);
   const [warningSB, setWarningSB] = useState(false);
   const [errorSB, setErrorSB] = useState(false);
+
+  // Commandes dont le statut calculé en direct est "Alerte"
+  const [commandesAlerte, setCommandesAlerte] = useState([]);
+  const [loadingAlertes, setLoadingAlertes] = useState(true);
 
   const openSuccessSB = () => setSuccessSB(true);
   const closeSuccessSB = () => setSuccessSB(false);
@@ -45,15 +39,27 @@ function Notifications() {
   const openErrorSB = () => setErrorSB(true);
   const closeErrorSB = () => setErrorSB(false);
 
-  const alertContent = (name) => (
-    <MDTypography variant="body2" color="white">
-      A simple {name} alert with{" "}
-      <MDTypography component="a" href="#" variant="body2" fontWeight="medium" color="white">
-        an example link
-      </MDTypography>
-      . Give it a click if you like.
-    </MDTypography>
-  );
+  useEffect(() => {
+    async function fetchCommandesAlerte() {
+      setLoadingAlertes(true);
+      try {
+        const response = await api.get("/commandes/getAllCommandes/");
+        const commandes = response.data.data || [];
+
+        // On ne garde que les commandes dont le statut calculé en direct
+        // (mêmes règles que le badge du tableau) est exactement "Alerte".
+        const alertes = commandes.filter((c) => getStatutBadge(c).label === "Alerte");
+
+        setCommandesAlerte(alertes);
+      } catch (error) {
+        console.error("Erreur lors de la récupération des commandes en alerte:", error);
+      } finally {
+        setLoadingAlertes(false);
+      }
+    }
+
+    fetchCommandesAlerte();
+  }, []);
 
   const renderSuccessSB = (
     <MDSnackbar
@@ -114,36 +120,53 @@ function Notifications() {
       <DashboardNavbar />
       <MDBox mt={6} mb={3}>
         <Grid container spacing={3} justifyContent="center">
+          {/* --- Alertes dynamiques : commandes au statut "Alerte" --- */}
           <Grid item xs={12} lg={8}>
             <Card>
-              <MDBox p={2}>
-                <MDTypography variant="h5">Alerts</MDTypography>
+              <MDBox p={2} lineHeight={0}>
+                <MDTypography variant="h5">Commandes en alerte</MDTypography>
+                <MDTypography variant="button" color="text" fontWeight="regular">
+                  Mise à disposition dans moins de 2 jours
+                </MDTypography>
               </MDBox>
-              <MDBox pt={2} px={2}>
-                <MDAlert color="primary" dismissible>
-                  {alertContent("primary")}
-                </MDAlert>
-                <MDAlert color="secondary" dismissible>
-                  {alertContent("secondary")}
-                </MDAlert>
-                <MDAlert color="success" dismissible>
-                  {alertContent("success")}
-                </MDAlert>
-                <MDAlert color="error" dismissible>
-                  {alertContent("error")}
-                </MDAlert>
-                <MDAlert color="warning" dismissible>
-                  {alertContent("warning")}
-                </MDAlert>
-                <MDAlert color="info" dismissible>
-                  {alertContent("info")}
-                </MDAlert>
-                <MDAlert color="light" dismissible>
-                  {alertContent("light")}
-                </MDAlert>
-                <MDAlert color="dark" dismissible>
-                  {alertContent("dark")}
-                </MDAlert>
+              <MDBox pt={2} px={2} pb={2}>
+                {loadingAlertes ? (
+                  <MDTypography variant="button" color="text">
+                    Chargement des alertes...
+                  </MDTypography>
+                ) : commandesAlerte.length === 0 ? (
+                  <MDAlert color="success" dismissible={false}>
+                    <MDTypography variant="body2" color="white">
+                      Aucune commande en alerte pour le moment.
+                    </MDTypography>
+                  </MDAlert>
+                ) : (
+                  commandesAlerte.map((commande) => (
+                    <MDAlert key={commande.id} color="error" dismissible>
+                      <MDTypography variant="body2" color="white">
+                        <MDTypography
+                          component="span"
+                          variant="body2"
+                          fontWeight="bold"
+                          color="white"
+                        >
+                          {commande.client}
+                        </MDTypography>{" "}
+                        — commande {commande.commande} ({commande.chaine}) : mise à disposition
+                        prévue le{" "}
+                        <MDTypography
+                          component="span"
+                          variant="body2"
+                          fontWeight="bold"
+                          color="white"
+                        >
+                          {commande.date_mise_disposition}
+                        </MDTypography>
+                        .
+                      </MDTypography>
+                    </MDAlert>
+                  ))
+                )}
               </MDBox>
             </Card>
           </Grid>
