@@ -274,12 +274,14 @@ function Tables() {
   const [clients, setClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(true);
 
-  // --- State de la popup "Ajouter client" ---
+  // --- State de la popup "Ajouter / Modifier client" ---
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [clientFormData, setClientFormData] = useState(emptyClientFormData);
   const [clientModelInput, setClientModelInput] = useState("");
   const [clientLoading, setClientLoading] = useState(false);
   const [clientMessage, setClientMessage] = useState("");
+  // null = mode création ; sinon id du client en cours de modification
+  const [editingClientId, setEditingClientId] = useState(null);
 
   // Suppression client : indicateur de chargement pendant l'appel DELETE
   const [deletingClient, setDeletingClient] = useState(false);
@@ -510,10 +512,27 @@ function Tables() {
     }
   };
 
-  // --- Handlers de la popup "Ajouter client" ---
+  // --- Handlers de la popup "Ajouter / Modifier client" ---
 
+  // Ouvre la popup en mode création (formulaire vide)
   const handleOpenClientDialog = () => {
+    setEditingClientId(null);
     setClientFormData(emptyClientFormData);
+    setClientModelInput("");
+    setClientMessage("");
+    setClientDialogOpen(true);
+  };
+
+  // Ouvre la popup en mode édition, pré-remplie avec le client actuellement
+  // sélectionné dans le formulaire principal.
+  const handleOpenEditClientDialog = () => {
+    if (!selectedClientObj) return;
+
+    setEditingClientId(selectedClientObj.id);
+    setClientFormData({
+      nom: selectedClientObj.nom || "",
+      models: Array.isArray(selectedClientObj.models) ? selectedClientObj.models : [],
+    });
     setClientModelInput("");
     setClientMessage("");
     setClientDialogOpen(true);
@@ -521,6 +540,7 @@ function Tables() {
 
   const handleCloseClientDialog = () => {
     setClientDialogOpen(false);
+    setEditingClientId(null);
   };
 
   const handleClientNomChange = (e) => {
@@ -550,6 +570,8 @@ function Tables() {
     });
   };
 
+  // Soumission du formulaire client : crée un nouveau client si
+  // editingClientId est null, sinon met à jour le client existant.
   const handleSubmitClient = async (e) => {
     e.preventDefault();
     setClientMessage("");
@@ -562,20 +584,38 @@ function Tables() {
     setClientLoading(true);
 
     try {
-      await api.post("/clients/createClient", {
-        nom: clientFormData.nom.trim(),
-        models: clientFormData.models,
-      });
+      if (editingClientId) {
+        // Mode édition : PUT /clients/updateClient/:id
+        await api.put(`/clients/updateClient/${editingClientId}`, {
+          nom: clientFormData.nom.trim(),
+          models: clientFormData.models,
+        });
 
-      // Rafraichit la liste deroulante et preselectionne le client cree
-      await fetchClients();
-      setFormData((prev) => ({ ...prev, client: clientFormData.nom.trim() }));
+        await fetchClients();
+        // Si le nom a changé, on met à jour la sélection du formulaire principal
+        setFormData((prev) => ({ ...prev, client: clientFormData.nom.trim() }));
+      } else {
+        // Mode création : POST /clients/createClient
+        await api.post("/clients/createClient", {
+          nom: clientFormData.nom.trim(),
+          models: clientFormData.models,
+        });
+
+        // Rafraichit la liste deroulante et preselectionne le client cree
+        await fetchClients();
+        setFormData((prev) => ({ ...prev, client: clientFormData.nom.trim() }));
+      }
 
       setClientDialogOpen(false);
       setClientFormData(emptyClientFormData);
+      setEditingClientId(null);
     } catch (error) {
-      console.error("Erreur lors de la création du client:", error);
-      setClientMessage("Erreur lors de la création du client.");
+      console.error("Erreur lors de l'enregistrement du client:", error);
+      setClientMessage(
+        editingClientId
+          ? "Erreur lors de la modification du client."
+          : "Erreur lors de la création du client."
+      );
     } finally {
       setClientLoading(false);
     }
@@ -772,7 +812,7 @@ function Tables() {
                     />
                   </Grid>
 
-                  {/* Client (liste deroulante alimentee par getAllClients) + boutons Ajouter/Supprimer */}
+                  {/* Client (liste deroulante alimentee par getAllClients) + boutons Ajouter/Modifier/Supprimer */}
                   <Grid item xs={12} sm={4}>
                     <MDBox display="flex" alignItems="flex-end" gap={1}>
                       <FormControl fullWidth>
@@ -802,6 +842,17 @@ function Tables() {
                         sx={{ whiteSpace: "nowrap", height: "44px" }}
                       >
                         Ajouter
+                      </MDButton>
+                      <MDButton
+                        variant="outlined"
+                        color="warning"
+                        size="small"
+                        type="button"
+                        onClick={handleOpenEditClientDialog}
+                        disabled={!formData.client}
+                        sx={{ whiteSpace: "nowrap", height: "44px" }}
+                      >
+                        Modifier
                       </MDButton>
                       <MDButton
                         variant="outlined"
@@ -1140,9 +1191,9 @@ function Tables() {
         </Grid>
       </MDBox>
 
-      {/* --- Popup "Ajouter client" --- */}
+      {/* --- Popup "Ajouter / Modifier client" --- */}
       <Dialog open={clientDialogOpen} onClose={handleCloseClientDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Ajouter un client</DialogTitle>
+        <DialogTitle>{editingClientId ? "Modifier le client" : "Ajouter un client"}</DialogTitle>
         <MDBox component="form" onSubmit={handleSubmitClient}>
           <DialogContent>
             <MDBox mb={3}>
@@ -1192,7 +1243,13 @@ function Tables() {
               Annuler
             </MDButton>
             <MDButton type="submit" variant="gradient" color="info" disabled={clientLoading}>
-              {clientLoading ? "Ajout..." : "Ajouter"}
+              {clientLoading
+                ? editingClientId
+                  ? "Modification..."
+                  : "Ajout..."
+                : editingClientId
+                ? "Modifier"
+                : "Ajouter"}
             </MDButton>
           </DialogActions>
         </MDBox>
