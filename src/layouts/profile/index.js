@@ -83,6 +83,7 @@ function Overview() {
                     fullName: fullName || "Non renseigné",
                     email: currentUser?.email || "Non renseigné",
                   }}
+                  social={[]}
                   action={{ route: "", tooltip: "Modifier le profil" }}
                   shadow={false}
                 />
