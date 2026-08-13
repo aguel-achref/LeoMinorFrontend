@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import api from "services/axiosConfig";
 
 // @mui material components
 import Grid from "@mui/material/Grid";
@@ -16,9 +15,10 @@ import MDSnackbar from "components/MDSnackbar";
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 
-// Même logique de calcul de statut que dans le tableau des commandes,
-// réutilisée ici pour ne garder que les commandes réellement en "Alerte".
-import { getStatutBadge } from "layouts/tables/data/authorsTableData";
+// Réutilise l'endpoint dashboard/summary (déjà vérifié fonctionnel), qui
+// renvoie commandesAlerte = commandes au statut "Alerte" OU "Jour disposition".
+// On filtre ensuite pour ne garder QUE le statut "Alerte" exact.
+import { fetchDashboardSummary } from "services/dashboardService";
 
 function Notifications() {
   const [successSB, setSuccessSB] = useState(false);
@@ -26,9 +26,10 @@ function Notifications() {
   const [warningSB, setWarningSB] = useState(false);
   const [errorSB, setErrorSB] = useState(false);
 
-  // Commandes dont le statut calculé en direct est "Alerte"
+  // Commandes dont le statut est exactement "Alerte"
   const [commandesAlerte, setCommandesAlerte] = useState([]);
   const [loadingAlertes, setLoadingAlertes] = useState(true);
+  const [erreurAlertes, setErreurAlertes] = useState(null);
 
   const openSuccessSB = () => setSuccessSB(true);
   const closeSuccessSB = () => setSuccessSB(false);
@@ -40,25 +41,32 @@ function Notifications() {
   const closeErrorSB = () => setErrorSB(false);
 
   useEffect(() => {
-    async function fetchCommandesAlerte() {
+    let isMounted = true;
+
+    async function loadAlertes() {
       setLoadingAlertes(true);
+      setErreurAlertes(null);
       try {
-        const response = await api.get("/commandes/getAllCommandes/");
-        const commandes = response.data.data || [];
+        const summary = await fetchDashboardSummary();
 
-        // On ne garde que les commandes dont le statut calculé en direct
-        // (mêmes règles que le badge du tableau) est exactement "Alerte".
-        const alertes = commandes.filter((c) => getStatutBadge(c).label === "Alerte");
+        // commandesAlerte du backend contient "Alerte" ET "Jour disposition" ;
+        // ici on ne garde que "Alerte" au sens strict.
+        const toutes = Array.isArray(summary?.commandesAlerte) ? summary.commandesAlerte : [];
+        const alertesUniquement = toutes.filter((c) => c.statut === "Alerte");
 
-        setCommandesAlerte(alertes);
+        if (isMounted) setCommandesAlerte(alertesUniquement);
       } catch (error) {
         console.error("Erreur lors de la récupération des commandes en alerte:", error);
+        if (isMounted) setErreurAlertes("Impossible de charger les alertes.");
       } finally {
-        setLoadingAlertes(false);
+        if (isMounted) setLoadingAlertes(false);
       }
     }
 
-    fetchCommandesAlerte();
+    loadAlertes();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const renderSuccessSB = (
@@ -124,7 +132,14 @@ function Notifications() {
           <Grid item xs={12} lg={8}>
             <Card>
               <MDBox p={2} lineHeight={0}>
-                <MDTypography variant="h5">Commandes en alerte</MDTypography>
+                <MDTypography variant="h5">
+                  Commandes en alerte
+                  {!loadingAlertes && commandesAlerte.length > 0 && (
+                    <MDTypography component="span" variant="h5" color="error" ml={1}>
+                      ({commandesAlerte.length})
+                    </MDTypography>
+                  )}
+                </MDTypography>
                 <MDTypography variant="button" color="text" fontWeight="regular">
                   Mise à disposition dans moins de 2 jours
                 </MDTypography>
@@ -134,6 +149,10 @@ function Notifications() {
                   <MDTypography variant="button" color="text">
                     Chargement des alertes...
                   </MDTypography>
+                ) : erreurAlertes ? (
+                  <MDTypography variant="button" color="error">
+                    {erreurAlertes}
+                  </MDTypography>
                 ) : commandesAlerte.length === 0 ? (
                   <MDAlert color="success" dismissible={false}>
                     <MDTypography variant="body2" color="white">
@@ -142,7 +161,7 @@ function Notifications() {
                   </MDAlert>
                 ) : (
                   commandesAlerte.map((commande) => (
-                    <MDAlert key={commande.id} color="error" dismissible>
+                    <MDAlert key={commande.id} color="error" dismissible={false}>
                       <MDTypography variant="body2" color="white">
                         <MDTypography
                           component="span"
@@ -152,8 +171,8 @@ function Notifications() {
                         >
                           {commande.client}
                         </MDTypography>{" "}
-                        — commande {commande.commande} ({commande.chaine}) : mise à disposition
-                        prévue le{" "}
+                        — commande n° {commande.commande} ({commande.chaine}) — mise à disposition
+                        le{" "}
                         <MDTypography
                           component="span"
                           variant="body2"
@@ -162,7 +181,6 @@ function Notifications() {
                         >
                           {commande.date_mise_disposition}
                         </MDTypography>
-                        .
                       </MDTypography>
                     </MDAlert>
                   ))
