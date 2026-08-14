@@ -194,14 +194,14 @@ function Dashboard() {
           </Grid>
         </MDBox>
 
-        {/* Heures par chaîne, par jour et par semaine */}
+        {/* Charge de travail réelle par chaîne, jour par jour et semaine par semaine */}
         <MDBox mt={4.5}>
           <Grid container spacing={3}>
             <Grid item xs={12} lg={6}>
               <MDBox mb={3}>
                 <MultiSeriesBarChart
                   title="Heures par chaîne — par jour"
-                  description="Charge de production quotidienne par chaîne"
+                  description="Charge de travail quotidienne (heures réparties sur la période de production de chaque commande)"
                   chart={toMultiSeriesChartFormat(heuresParChaineParJour)}
                 />
               </MDBox>
@@ -210,7 +210,7 @@ function Dashboard() {
               <MDBox mb={3}>
                 <MultiSeriesBarChart
                   title="Heures par chaîne — par semaine"
-                  description="Charge de production hebdomadaire par chaîne"
+                  description="Charge de travail hebdomadaire (même répartition, agrégée par semaine ISO)"
                   chart={toMultiSeriesChartFormat(heuresParChaineParSemaine)}
                 />
               </MDBox>
