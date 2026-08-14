@@ -19,7 +19,7 @@ import MDTypography from "components/MDTypography";
 import breakpoints from "assets/theme/base/breakpoints";
 
 // Images
-import backgroundImage from "assets/images/bg-profile.jpeg";
+import backgroundImage from "assets/images/bg-profile.jpg";
 
 // Infos de l'utilisateur connecté, récupérées via GET /users/me
 import { fetchCurrentUser } from "services/userService";
