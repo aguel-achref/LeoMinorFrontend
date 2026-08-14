@@ -6,10 +6,7 @@ import PropTypes from "prop-types";
 // @mui material components
 import Card from "@mui/material/Card";
 import Grid from "@mui/material/Grid";
-import AppBar from "@mui/material/AppBar";
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
-import Icon from "@mui/material/Icon";
+import Avatar from "@mui/material/Avatar";
 
 // Material Dashboard 2 React components
 import MDBox from "components/MDBox";
@@ -26,7 +23,6 @@ import { fetchCurrentUser } from "services/userService";
 
 function Header({ children }) {
   const [tabsOrientation, setTabsOrientation] = useState("horizontal");
-  const [tabValue, setTabValue] = useState(0);
 
   // Utilisateur connecté, affiché en haut du profil à la place du mock
   // "Richard Davis". Chargé indépendamment du contenu passé en children.
@@ -41,15 +37,9 @@ function Header({ children }) {
         : setTabsOrientation("horizontal");
     }
 
-    /** 
-     The event listener that's calling the handleTabsOrientation function when resizing the window.
-    */
     window.addEventListener("resize", handleTabsOrientation);
-
-    // Call the handleTabsOrientation function to set the state with the initial value.
     handleTabsOrientation();
 
-    // Remove event listener on cleanup
     return () => window.removeEventListener("resize", handleTabsOrientation);
   }, [tabsOrientation]);
 
@@ -73,10 +63,19 @@ function Header({ children }) {
     };
   }, []);
 
-  const handleSetTabValue = (event, newValue) => setTabValue(newValue);
-
   const fullName = currentUser
     ? `${currentUser.first_name || ""} ${currentUser.last_name || ""}`.trim()
+    : "";
+
+  // Initiales utilisées comme fallback si aucune photo de profil n'est disponible
+  const initials = fullName
+    ? fullName
+        .split(" ")
+        .filter(Boolean)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
     : "";
 
   return (
@@ -109,6 +108,20 @@ function Header({ children }) {
       >
         <Grid container spacing={3} alignItems="center">
           <Grid item>
+            <Avatar
+              src={currentUser?.avatar_url || undefined}
+              alt={fullName || "Avatar utilisateur"}
+              sx={{
+                width: 74,
+                height: 74,
+                fontWeight: "bold",
+                bgcolor: ({ palette }) => palette.info.main,
+              }}
+            >
+              {!currentUser?.avatar_url && (initials || "")}
+            </Avatar>
+          </Grid>
+          <Grid item>
             <MDBox height="100%" mt={0.5} lineHeight={1}>
               <MDTypography variant="h5" fontWeight="medium">
                 {loadingUser ? "Chargement..." : fullName || "Utilisateur"}
@@ -127,12 +140,10 @@ function Header({ children }) {
   );
 }
 
-// Setting default props for the Header
 Header.defaultProps = {
   children: "",
 };
 
-// Typechecking props for the Header
 Header.propTypes = {
   children: PropTypes.node,
 };
