@@ -20,6 +20,7 @@ import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import ReportsBarChart from "examples/Charts/BarCharts/ReportsBarChart";
 import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatisticsCard";
+import GaugeGridCard from "examples/Charts/GaugeGridCard";
 
 // Dashboard data helpers
 import { fetchDashboardSummary } from "services/dashboardService";
@@ -195,21 +196,19 @@ function Dashboard() {
           </Grid>
         </MDBox>
 
-        {/* Charge de travail par chaîne : aujourd'hui et cette semaine */}
+        {/* Charge de travail par chaîne : aujourd'hui (jauges) et cette semaine (barres) */}
         <MDBox mt={4.5}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} lg={7}>
               <MDBox mb={3}>
-                <ReportsBarChart
-                  color="primary"
-                  title={`Heures par chaîne — aujourd'hui`}
-                  description={`Commandes en cours le ${dateAujourdhuiLabel}`}
-                  date="mis à jour à l'instant"
-                  chart={toChartFormat(heuresParChaineAujourdhui, "Heures", "total")}
+                <GaugeGridCard
+                  title="Heures par chaîne — aujourd'hui"
+                  description={`Commandes en cours le ${dateAujourdhuiLabel} — heures / objectif_heure`}
+                  data={heuresParChaineAujourdhui}
                 />
               </MDBox>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} lg={5}>
               <MDBox mb={3}>
                 <ReportsBarChart
                   color="warning"
