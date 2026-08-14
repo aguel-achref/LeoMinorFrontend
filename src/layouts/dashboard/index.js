@@ -213,7 +213,7 @@ function Dashboard() {
                 <ReportsBarChart
                   color="warning"
                   title="Heures par chaîne — cette semaine"
-                  description={`Semaine du ${semaineLabel}`}
+                  description={`Semaine ${semaineLabel}`}
                   date="mis à jour à l'instant"
                   chart={toChartFormat(heuresParChaineSemaine, "Heures", "total")}
                 />
