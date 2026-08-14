@@ -19,12 +19,11 @@ import MDTypography from "components/MDTypography";
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import ReportsBarChart from "examples/Charts/BarCharts/ReportsBarChart";
-import MultiSeriesBarChart from "examples/Charts/BarCharts/MultiSeriesBarChart";
 import ComplexStatisticsCard from "examples/Cards/StatisticsCards/ComplexStatisticsCard";
 
 // Dashboard data helpers
 import { fetchDashboardSummary } from "services/dashboardService";
-import { toChartFormat, toMultiSeriesChartFormat } from "layouts/dashboard/data/chartAdapters";
+import { toChartFormat } from "layouts/dashboard/data/chartAdapters";
 
 function Dashboard() {
   const [summary, setSummary] = useState(null);
@@ -85,8 +84,10 @@ function Dashboard() {
     commandesParClient,
     commandesParChaine,
     heuresParClient,
-    heuresParChaineParJour,
-    heuresParChaineParSemaine,
+    heuresParChaineAujourdhui,
+    heuresParChaineSemaine,
+    dateAujourdhuiLabel,
+    semaineLabel,
     commandesAlerte,
   } = summary;
 
@@ -194,24 +195,28 @@ function Dashboard() {
           </Grid>
         </MDBox>
 
-        {/* Charge de travail réelle par chaîne, jour par jour et semaine par semaine */}
+        {/* Charge de travail par chaîne : aujourd'hui et cette semaine */}
         <MDBox mt={4.5}>
           <Grid container spacing={3}>
-            <Grid item xs={12} lg={6}>
+            <Grid item xs={12} md={6}>
               <MDBox mb={3}>
-                <MultiSeriesBarChart
-                  title="Heures par chaîne — par jour"
-                  description="Charge de travail quotidienne (heures réparties sur la période de production de chaque commande)"
-                  chart={toMultiSeriesChartFormat(heuresParChaineParJour)}
+                <ReportsBarChart
+                  color="primary"
+                  title={`Heures par chaîne — aujourd'hui`}
+                  description={`Commandes en cours le ${dateAujourdhuiLabel}`}
+                  date="mis à jour à l'instant"
+                  chart={toChartFormat(heuresParChaineAujourdhui, "Heures", "total")}
                 />
               </MDBox>
             </Grid>
-            <Grid item xs={12} lg={6}>
+            <Grid item xs={12} md={6}>
               <MDBox mb={3}>
-                <MultiSeriesBarChart
-                  title="Heures par chaîne — par semaine"
-                  description="Charge de travail hebdomadaire (même répartition, agrégée par semaine ISO)"
-                  chart={toMultiSeriesChartFormat(heuresParChaineParSemaine)}
+                <ReportsBarChart
+                  color="warning"
+                  title="Heures par chaîne — cette semaine"
+                  description={`Semaine du ${semaineLabel}`}
+                  date="mis à jour à l'instant"
+                  chart={toChartFormat(heuresParChaineSemaine, "Heures", "total")}
                 />
               </MDBox>
             </Grid>
